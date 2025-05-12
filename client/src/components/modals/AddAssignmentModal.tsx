@@ -202,7 +202,7 @@ export function AddAssignmentModal({
                     <SelectValue placeholder="Select an item to assign" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Select an item</SelectItem>
+                    <SelectItem key="select-placeholder" value="item_placeholder">Select an item</SelectItem>
                     {hardware && hardware.filter(h => h.status === 'in_stock').map(h => (
                       <SelectItem key={`hw_${h.id}`} value={`hw_${h.id}`}>{h.name} (Hardware)</SelectItem>
                     ))}

@@ -443,14 +443,9 @@ export default function UsersPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      <motion.div
-                        variants={container}
-                        initial="hidden"
-                        animate="visible"
-                        className="contents"
-                      >
+                      <>
                         {filteredUsers.map((user) => (
-                          <motion.tr key={user.id} variants={item} className="border-b">
+                          <TableRow key={user.id} className="border-b opacity-0 animate-fadeIn" style={{animationDelay: `${filteredUsers.indexOf(user) * 0.05}s`, animationFillMode: 'forwards'}}>
                             <TableCell className="font-medium">{user.fullName}</TableCell>
                             <TableCell>{user.username}</TableCell>
                             <TableCell>{user.email}</TableCell>
@@ -499,9 +494,9 @@ export default function UsersPage() {
                                 </Button>
                               </div>
                             </TableCell>
-                          </motion.tr>
+                          </TableRow>
                         ))}
-                      </motion.div>
+                      </>
                     )}
                   </TableBody>
                 </Table>
