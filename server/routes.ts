@@ -3,10 +3,19 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import { insertHardwareSchema, insertCredentialSchema, insertNetworkDeviceSchema, insertVlanSchema, insertGeneralInventorySchema, insertAssignmentSchema, insertActivityLogSchema, insertUserSchema } from "@shared/schema";
+import { setupAuth, checkRole } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication
+  setupAuth(app);
+  
   // prefix all routes with /api
   const apiRouter = app;
+
+  // Role definitions for middleware
+  const ADMIN_ROLES = ["admin"];
+  const MANAGER_ROLES = ["admin", "manager"];
+  const TECH_ROLES = ["admin", "manager", "technician"];
 
   // Hardware routes
   apiRouter.get("/api/hardware", async (req: Request, res: Response) => {
