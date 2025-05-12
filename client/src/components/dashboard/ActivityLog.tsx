@@ -127,7 +127,7 @@ function ActivityItem({ log }: ActivityItemProps) {
 }
 
 export function ActivityLog() {
-  const { data: activityLogs, isLoading, error } = useQuery({
+  const { data: activityLogs = [], isLoading, error } = useQuery<ActivityLogType[]>({
     queryKey: ['/api/activity-logs'],
     staleTime: 60000, // 1 minute
   });
@@ -150,7 +150,7 @@ export function ActivityLog() {
           </div>
         ) : activityLogs && activityLogs.length > 0 ? (
           <ul className="space-y-3">
-            {activityLogs.slice(0, 5).map((log) => (
+            {activityLogs.slice(0, 5).map((log: ActivityLogType) => (
               <ActivityItem key={log.id} log={log} />
             ))}
           </ul>

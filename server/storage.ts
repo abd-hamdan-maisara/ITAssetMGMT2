@@ -55,6 +55,14 @@ export interface IStorage {
   getActivityLog(id: number): Promise<ActivityLog | undefined>;
   getAllActivityLogs(): Promise<ActivityLog[]>;
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+  
+  // User methods
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
+  deleteUser(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {

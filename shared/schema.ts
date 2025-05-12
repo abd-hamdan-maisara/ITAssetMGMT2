@@ -6,6 +6,7 @@ import { z } from "zod";
 export const statusEnum = pgEnum('status', ['in_stock', 'assigned', 'maintenance', 'retired']);
 export const hardwareTypeEnum = pgEnum('type', ['laptop', 'desktop', 'server', 'monitor', 'printer', 'network', 'peripheral', 'other']);
 export const credentialTypeEnum = pgEnum('credential_type', ['network', 'server', 'service', 'database', 'api']);
+export const userRoleEnum = pgEnum('user_role', ['admin', 'manager', 'technician', 'readonly']);
 
 // Hardware table
 export const hardware = pgTable("hardware", {
@@ -97,6 +98,20 @@ export const assignments = pgTable("assignments", {
   lastUpdated: timestamp("last_updated").defaultNow()
 });
 
+// User table
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  email: text("email").notNull().unique(),
+  fullName: text("full_name").notNull(),
+  role: userRoleEnum("role").notNull().default('readonly'),
+  department: text("department"),
+  isActive: boolean("is_active").notNull().default(true),
+  lastLogin: timestamp("last_login"),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+});
+
 // Activity log table
 export const activityLogs = pgTable("activity_logs", {
   id: serial("id").primaryKey(),
@@ -116,6 +131,7 @@ export const insertVlanSchema = createInsertSchema(vlans).omit({ id: true, lastU
 export const insertGeneralInventorySchema = createInsertSchema(generalInventory).omit({ id: true, lastUpdated: true });
 export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true, lastUpdated: true });
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true, timestamp: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, lastLogin: true, createdAt: true });
 
 // Types
 export type Hardware = typeof hardware.$inferSelect;
@@ -138,3 +154,6 @@ export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
