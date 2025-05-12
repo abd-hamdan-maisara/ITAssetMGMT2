@@ -144,11 +144,25 @@ export class MemStorage implements IStorage {
   async createHardware(hardware: InsertHardware): Promise<Hardware> {
     const id = this.hardwareId++;
     const now = new Date();
+    
+    // Create hardware with proper defaults for all required fields
     const newHardware: Hardware = { 
-      ...hardware, 
-      id, 
-      lastUpdated: now 
+      id,
+      name: hardware.name,
+      type: hardware.type,
+      status: hardware.status || 'in_stock',
+      manufacturer: hardware.manufacturer,
+      model: hardware.model,
+      serialNumber: hardware.serialNumber,
+      purchaseDate: hardware.purchaseDate || null,
+      warrantyExpiry: hardware.warrantyExpiry || null,
+      location: hardware.location || null,
+      notes: hardware.notes || null,
+      assignedTo: hardware.assignedTo || null,
+      lastUpdated: now,
+      imageUrl: hardware.imageUrl || null
     };
+    
     this.hardware.set(id, newHardware);
     return newHardware;
   }
@@ -182,11 +196,21 @@ export class MemStorage implements IStorage {
   async createCredential(credential: InsertCredential): Promise<Credential> {
     const id = this.credentialId++;
     const now = new Date();
+    
+    // Create credentials with proper defaults for all required fields
     const newCredential: Credential = { 
-      ...credential, 
-      id, 
-      lastUpdated: now 
+      id,
+      name: credential.name,
+      type: credential.type,
+      username: credential.username,
+      password: credential.password,
+      url: credential.url || null,
+      notes: credential.notes || null,
+      lastUpdated: now,
+      ipAddress: credential.ipAddress || null,
+      expirationDate: credential.expirationDate || null
     };
+    
     this.credentials.set(id, newCredential);
     return newCredential;
   }
@@ -220,11 +244,24 @@ export class MemStorage implements IStorage {
   async createNetworkDevice(device: InsertNetworkDevice): Promise<NetworkDevice> {
     const id = this.networkDeviceId++;
     const now = new Date();
+    
+    // Create network device with proper defaults for all required fields
     const newDevice: NetworkDevice = { 
-      ...device, 
-      id, 
-      lastUpdated: now 
+      id,
+      name: device.name,
+      type: device.type,
+      manufacturer: device.manufacturer,
+      model: device.model,
+      serialNumber: device.serialNumber,
+      ipAddress: device.ipAddress,
+      macAddress: device.macAddress || null,
+      location: device.location || null,
+      status: device.status || 'in_stock',
+      notes: device.notes || null,
+      purchaseDate: device.purchaseDate || null,
+      lastUpdated: now
     };
+    
     this.networkDevices.set(id, newDevice);
     return newDevice;
   }
@@ -258,11 +295,18 @@ export class MemStorage implements IStorage {
   async createVlan(vlan: InsertVlan): Promise<Vlan> {
     const id = this.vlanId++;
     const now = new Date();
+    
+    // Create VLAN with proper defaults for all required fields
     const newVlan: Vlan = { 
-      ...vlan, 
-      id, 
-      lastUpdated: now 
+      id,
+      vlanId: vlan.vlanId,
+      name: vlan.name,
+      subnet: vlan.subnet,
+      description: vlan.description || null,
+      assignedDevices: vlan.assignedDevices || null,
+      lastUpdated: now
     };
+    
     this.vlans.set(id, newVlan);
     return newVlan;
   }
@@ -334,12 +378,33 @@ export class MemStorage implements IStorage {
   async createAssignment(assignment: InsertAssignment): Promise<Assignment> {
     const id = this.assignmentId++;
     const now = new Date();
+    
+    // Create new assignment with proper defaults for all required fields
     const newAssignment: Assignment = { 
-      ...assignment, 
-      id, 
-      lastUpdated: now 
+      id,
+      assignedTo: assignment.assignedTo,
+      status: assignment.status || 'active',
+      notes: assignment.notes || null,
+      lastUpdated: now,
+      hardwareId: assignment.hardwareId || null,
+      networkDeviceId: assignment.networkDeviceId || null,
+      generalInventoryId: assignment.generalInventoryId || null,
+      department: assignment.department || null,
+      assignmentDate: assignment.assignmentDate || now,
+      returnDate: assignment.returnDate || null
     };
+    
     this.assignments.set(id, newAssignment);
+    
+    // Create activity log
+    await this.createActivityLog({
+      userId: 'system',
+      action: 'add',
+      itemType: 'assignment',
+      itemId: id,
+      details: `Created assignment for ${newAssignment.assignedTo}`
+    });
+    
     return newAssignment;
   }
 
