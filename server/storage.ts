@@ -6,6 +6,7 @@ import {
   GeneralInventoryItem, InsertGeneralInventoryItem,
   Assignment, InsertAssignment,
   ActivityLog, InsertActivityLog,
+  User, InsertUser,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -73,6 +74,7 @@ export class MemStorage implements IStorage {
   private generalInventory: Map<number, GeneralInventoryItem>;
   private assignments: Map<number, Assignment>;
   private activityLogs: Map<number, ActivityLog>;
+  private users: Map<number, User>;
   
   private hardwareId: number = 1;
   private credentialId: number = 1;
@@ -81,6 +83,7 @@ export class MemStorage implements IStorage {
   private generalInventoryId: number = 1;
   private assignmentId: number = 1;
   private activityLogId: number = 1;
+  private userId: number = 1;
 
   constructor() {
     this.hardware = new Map();
@@ -90,6 +93,7 @@ export class MemStorage implements IStorage {
     this.generalInventory = new Map();
     this.assignments = new Map();
     this.activityLogs = new Map();
+    this.users = new Map();
   }
 
   // Hardware methods
@@ -342,6 +346,94 @@ export class MemStorage implements IStorage {
     };
     this.activityLogs.set(id, newLog);
     return newLog;
+  }
+
+  // User methods
+  async getUser(id: number): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    for (const user of this.users.values()) {
+      if (user.username.toLowerCase() === username.toLowerCase()) {
+        return user;
+      }
+    }
+    return undefined;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const id = this.userId++;
+    const now = new Date();
+    const newUser: User = {
+      ...user,
+      id,
+      createdAt: now,
+      lastLogin: null
+    };
+    this.users.set(id, newUser);
+    
+    // Create activity log
+    await this.createActivityLog({
+      userId: 'system',
+      action: 'add',
+      itemType: 'user',
+      itemId: id,
+      details: `Added user ${user.username} with role ${user.role}`
+    });
+    
+    return newUser;
+  }
+
+  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
+    const user = await this.getUser(id);
+    if (!user) {
+      return undefined;
+    }
+
+    const updatedUser: User = {
+      ...user,
+      ...userData,
+    };
+
+    this.users.set(id, updatedUser);
+    
+    // Create activity log
+    await this.createActivityLog({
+      userId: 'system',
+      action: 'update',
+      itemType: 'user',
+      itemId: id,
+      details: `Updated user ${user.username}`
+    });
+    
+    return updatedUser;
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    const user = await this.getUser(id);
+    if (!user) {
+      return false;
+    }
+    
+    const success = this.users.delete(id);
+    
+    if (success) {
+      // Create activity log
+      await this.createActivityLog({
+        userId: 'system',
+        action: 'delete',
+        itemType: 'user',
+        itemId: id,
+        details: `Deleted user ${user.username}`
+      });
+    }
+    
+    return success;
   }
 }
 
