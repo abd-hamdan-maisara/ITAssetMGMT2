@@ -12,6 +12,7 @@ import Networking from "@/pages/Networking";
 import GeneralInventory from "@/pages/GeneralInventory";
 import Assignments from "@/pages/Assignments";
 import Reports from "@/pages/Reports";
+import Users from "@/pages/Users";
 import NotFound from "@/pages/not-found";
 
 function Router() {
