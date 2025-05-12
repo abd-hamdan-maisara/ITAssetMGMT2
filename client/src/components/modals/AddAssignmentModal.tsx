@@ -79,6 +79,20 @@ export function AddAssignmentModal({
       };
       
       const response = await apiRequest('POST', '/api/assignments', formattedData);
+      
+      // Update the status of the assigned item after successful assignment
+      const hwId = formattedData.hardwareId;
+      const netId = formattedData.networkDeviceId;
+      const genId = formattedData.generalInventoryId;
+      
+      if (hwId) {
+        apiRequest('PUT', `/api/hardware/${hwId}`, { status: 'assigned' });
+      } else if (netId) {
+        apiRequest('PUT', `/api/network-devices/${netId}`, { status: 'assigned' });
+      } else if (genId) {
+        apiRequest('PUT', `/api/general-inventory/${genId}`, { status: 'assigned' });
+      }
+      
       return response.json();
     },
     onSuccess: () => {
@@ -86,20 +100,13 @@ export function AddAssignmentModal({
         title: 'Assignment Created',
         description: 'The item has been successfully assigned.',
       });
+      
+      // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['/api/assignments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/activity-logs'] });
-      
-      // Update the status of the assigned item
-      if (hardwareId) {
-        queryClient.invalidateQueries({ queryKey: ['/api/hardware'] });
-        apiRequest('PUT', `/api/hardware/${hardwareId}`, { status: 'assigned' });
-      } else if (networkDeviceId) {
-        queryClient.invalidateQueries({ queryKey: ['/api/network-devices'] });
-        apiRequest('PUT', `/api/network-devices/${networkDeviceId}`, { status: 'assigned' });
-      } else if (generalInventoryId) {
-        queryClient.invalidateQueries({ queryKey: ['/api/general-inventory'] });
-        apiRequest('PUT', `/api/general-inventory/${generalInventoryId}`, { status: 'assigned' });
-      }
+      queryClient.invalidateQueries({ queryKey: ['/api/hardware'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/network-devices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/general-inventory'] });
       
       form.reset();
       onClose();
@@ -203,13 +210,13 @@ export function AddAssignmentModal({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem key="select-placeholder" value="item_placeholder">Select an item</SelectItem>
-                    {hardware && hardware.filter(h => h.status === 'in_stock').map(h => (
+                    {hardware && Array.isArray(hardware) && hardware.filter((h: any) => h.status === 'in_stock').map((h: any) => (
                       <SelectItem key={`hw_${h.id}`} value={`hw_${h.id}`}>{h.name} (Hardware)</SelectItem>
                     ))}
-                    {networkDevices && networkDevices.filter(n => n.status === 'in_stock').map(n => (
+                    {networkDevices && Array.isArray(networkDevices) && networkDevices.filter((n: any) => n.status === 'in_stock').map((n: any) => (
                       <SelectItem key={`net_${n.id}`} value={`net_${n.id}`}>{n.name} (Network)</SelectItem>
                     ))}
-                    {generalInventory && generalInventory.filter(g => g.status === 'in_stock').map(g => (
+                    {generalInventory && Array.isArray(generalInventory) && generalInventory.filter((g: any) => g.status === 'in_stock').map((g: any) => (
                       <SelectItem key={`gen_${g.id}`} value={`gen_${g.id}`}>{g.name} (General)</SelectItem>
                     ))}
                   </SelectContent>

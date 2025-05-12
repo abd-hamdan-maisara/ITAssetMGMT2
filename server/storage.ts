@@ -340,11 +340,22 @@ export class MemStorage implements IStorage {
   async createGeneralInventoryItem(item: InsertGeneralInventoryItem): Promise<GeneralInventoryItem> {
     const id = this.generalInventoryId++;
     const now = new Date();
+    
+    // Create general inventory item with proper defaults for all required fields
     const newItem: GeneralInventoryItem = { 
-      ...item, 
-      id, 
-      lastUpdated: now 
+      id,
+      name: item.name,
+      category: item.category,
+      description: item.description || null,
+      serialNumber: item.serialNumber || null,
+      quantity: item.quantity || 1,
+      location: item.location || null,
+      status: item.status || 'in_stock',
+      notes: item.notes || null,
+      purchaseDate: item.purchaseDate || null,
+      lastUpdated: now
     };
+    
     this.generalInventory.set(id, newItem);
     return newItem;
   }
@@ -440,11 +451,18 @@ export class MemStorage implements IStorage {
   async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
     const id = this.activityLogId++;
     const now = new Date();
+    
+    // Create activity log with proper defaults for all required fields
     const newLog: ActivityLog = { 
-      ...log, 
-      id, 
-      timestamp: now 
+      id,
+      userId: log.userId,
+      action: log.action,
+      itemType: log.itemType,
+      itemId: log.itemId,
+      details: log.details || null,
+      timestamp: now
     };
+    
     this.activityLogs.set(id, newLog);
     return newLog;
   }
