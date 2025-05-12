@@ -26,6 +26,7 @@ function Router() {
         <Route path="/general" component={GeneralInventory} />
         <Route path="/assignments" component={Assignments} />
         <Route path="/reports" component={Reports} />
+        <Route path="/users" component={Users} />
         <Route component={NotFound} />
       </Switch>
     </MainLayout>

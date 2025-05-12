@@ -10,6 +10,7 @@ import {
   UserPlus,
   FileText,
   Home,
+  Users,
   X
 } from 'lucide-react';
 
@@ -62,6 +63,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       href: '/reports',
       label: 'Reports',
       icon: <FileText className="h-5 w-5" />,
+    },
+    {
+      href: '/users',
+      label: 'User Management',
+      icon: <Users className="h-5 w-5" />,
     },
   ];
 

@@ -450,7 +450,7 @@ export default function UsersPage() {
                         className="contents"
                       >
                         {filteredUsers.map((user) => (
-                          <TableRow key={user.id} as={motion.tr} variants={item}>
+                          <motion.tr key={user.id} variants={item} className="border-b">
                             <TableCell className="font-medium">{user.fullName}</TableCell>
                             <TableCell>{user.username}</TableCell>
                             <TableCell>{user.email}</TableCell>
@@ -499,7 +499,7 @@ export default function UsersPage() {
                                 </Button>
                               </div>
                             </TableCell>
-                          </TableRow>
+                          </motion.tr>
                         ))}
                       </motion.div>
                     )}
