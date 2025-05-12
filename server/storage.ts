@@ -94,6 +94,42 @@ export class MemStorage implements IStorage {
     this.assignments = new Map();
     this.activityLogs = new Map();
     this.users = new Map();
+
+    // Initialize with a default admin user
+    this.initializeDefaultData();
+  }
+
+  private initializeDefaultData() {
+    // Create default admin user if none exists
+    if (this.users.size === 0) {
+      const now = new Date();
+      const adminUser: User = {
+        id: this.userId++,
+        username: 'admin',
+        password: 'admin123', // In production, this should be properly hashed
+        email: 'admin@itinventory.com',
+        fullName: 'IT Admin',
+        role: 'admin',
+        department: 'IT Department',
+        isActive: true,
+        lastLogin: null,
+        createdAt: now
+      };
+      this.users.set(adminUser.id, adminUser);
+
+      // Create activity log for the admin user creation
+      const logId = this.activityLogId++;
+      const log: ActivityLog = {
+        id: logId,
+        userId: 'system',
+        action: 'add',
+        itemType: 'user',
+        itemId: adminUser.id,
+        details: 'Created default admin user',
+        timestamp: now
+      };
+      this.activityLogs.set(logId, log);
+    }
   }
 
   // Hardware methods
@@ -401,9 +437,19 @@ export class MemStorage implements IStorage {
       return undefined;
     }
 
+    // Handle each field individually to ensure type safety
     const updatedUser: User = {
       ...user,
-      ...userData,
+      username: userData.username !== undefined ? userData.username : user.username,
+      password: userData.password !== undefined ? userData.password : user.password,
+      email: userData.email !== undefined ? userData.email : user.email,
+      fullName: userData.fullName !== undefined ? userData.fullName : user.fullName,
+      role: userData.role !== undefined ? userData.role : user.role,
+      department: userData.department !== undefined ? userData.department : user.department,
+      isActive: userData.isActive !== undefined ? userData.isActive : user.isActive,
+      lastLogin: user.lastLogin,
+      createdAt: user.createdAt,
+      id: user.id
     };
 
     this.users.set(id, updatedUser);
