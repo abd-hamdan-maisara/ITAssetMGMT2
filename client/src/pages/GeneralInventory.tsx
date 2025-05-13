@@ -180,11 +180,14 @@ export default function GeneralInventoryPage() {
         </Card>
         
         <Card className="overflow-hidden">
-          <img 
-            src="https://images.unsplash.com/photo-1571756800439-d1c8cc6a6aa8?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=400" 
-            alt="Conference room with projector and AV equipment" 
-            className="w-full h-48 object-cover" 
-          />
+          <div className="w-full h-48 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+            <div className="text-white text-center">
+              <svg className="mx-auto h-16 w-16 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+              </svg>
+              <h3 className="font-bold">AV Equipment</h3>
+            </div>
+          </div>
           <CardContent className="p-4">
             <h3 className="font-bold">AV Equipment</h3>
             <p className="text-sm text-muted-foreground mb-3">Projectors, screens and conference room tech</p>

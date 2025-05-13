@@ -1,470 +1,210 @@
-import { 
-  Hardware, InsertHardware, 
-  Credential, InsertCredential, 
-  NetworkDevice, InsertNetworkDevice, 
-  Vlan, InsertVlan, 
-  GeneralInventoryItem, InsertGeneralInventoryItem,
-  Assignment, InsertAssignment,
-  ActivityLog, InsertActivityLog,
-  User, InsertUser,
-} from "@shared/schema";
+import { activities, categories, orderItems, orders, products, suppliers, type Activity, type Category, type InsertActivity, type InsertCategory, type InsertOrder, type InsertOrderItem, type InsertProduct, type InsertSupplier, type Order, type OrderItem, type Product, type Supplier, ActivityTypes } from "@shared/schema";
 
 export interface IStorage {
-  // Hardware methods
-  getHardware(id: number): Promise<Hardware | undefined>;
-  getAllHardware(): Promise<Hardware[]>;
-  createHardware(hardware: InsertHardware): Promise<Hardware>;
-  updateHardware(id: number, hardware: Partial<InsertHardware>): Promise<Hardware | undefined>;
-  deleteHardware(id: number): Promise<boolean>;
+  // Categories
+  getCategories(): Promise<Category[]>;
+  getCategoryById(id: number): Promise<Category | undefined>;
+  createCategory(category: InsertCategory): Promise<Category>;
   
-  // Credential methods
-  getCredential(id: number): Promise<Credential | undefined>;
-  getAllCredentials(): Promise<Credential[]>;
-  createCredential(credential: InsertCredential): Promise<Credential>;
-  updateCredential(id: number, credential: Partial<InsertCredential>): Promise<Credential | undefined>;
-  deleteCredential(id: number): Promise<boolean>;
+  // Products
+  getProducts(): Promise<Product[]>;
+  getProductById(id: number): Promise<Product | undefined>;
+  getProductsByCategoryId(categoryId: number): Promise<Product[]>;
+  getLowStockProducts(): Promise<Product[]>;
+  createProduct(product: InsertProduct): Promise<Product>;
+  updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined>;
+  updateProductStock(id: number, newStock: number): Promise<Product | undefined>;
   
-  // Network device methods
-  getNetworkDevice(id: number): Promise<NetworkDevice | undefined>;
-  getAllNetworkDevices(): Promise<NetworkDevice[]>;
-  createNetworkDevice(device: InsertNetworkDevice): Promise<NetworkDevice>;
-  updateNetworkDevice(id: number, device: Partial<InsertNetworkDevice>): Promise<NetworkDevice | undefined>;
-  deleteNetworkDevice(id: number): Promise<boolean>;
+  // Suppliers
+  getSuppliers(): Promise<Supplier[]>;
+  getSupplierById(id: number): Promise<Supplier | undefined>;
+  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
   
-  // VLAN methods
-  getVlan(id: number): Promise<Vlan | undefined>;
-  getAllVlans(): Promise<Vlan[]>;
-  createVlan(vlan: InsertVlan): Promise<Vlan>;
-  updateVlan(id: number, vlan: Partial<InsertVlan>): Promise<Vlan | undefined>;
-  deleteVlan(id: number): Promise<boolean>;
+  // Orders
+  getOrders(): Promise<Order[]>;
+  getOrderById(id: number): Promise<Order | undefined>;
+  getActiveOrders(): Promise<Order[]>;
+  createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
+  updateOrderStatus(id: number, status: string): Promise<Order | undefined>;
+  getOrderItems(orderId: number): Promise<OrderItem[]>;
   
-  // General inventory methods
-  getGeneralInventoryItem(id: number): Promise<GeneralInventoryItem | undefined>;
-  getAllGeneralInventory(): Promise<GeneralInventoryItem[]>;
-  createGeneralInventoryItem(item: InsertGeneralInventoryItem): Promise<GeneralInventoryItem>;
-  updateGeneralInventoryItem(id: number, item: Partial<InsertGeneralInventoryItem>): Promise<GeneralInventoryItem | undefined>;
-  deleteGeneralInventoryItem(id: number): Promise<boolean>;
+  // Activities
+  getActivities(limit?: number): Promise<Activity[]>;
+  createActivity(activity: InsertActivity): Promise<Activity>;
   
-  // Assignment methods
-  getAssignment(id: number): Promise<Assignment | undefined>;
-  getAllAssignments(): Promise<Assignment[]>;
-  createAssignment(assignment: InsertAssignment): Promise<Assignment>;
-  updateAssignment(id: number, assignment: Partial<InsertAssignment>): Promise<Assignment | undefined>;
-  deleteAssignment(id: number): Promise<boolean>;
+  // Dashboard
+  getDashboardStats(): Promise<{ totalProducts: number; lowStockItems: number; activeOrders: number; totalSuppliers: number }>;
   
-  // Activity log methods
-  getActivityLog(id: number): Promise<ActivityLog | undefined>;
-  getAllActivityLogs(): Promise<ActivityLog[]>;
-  createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
-  
-  // User methods
+  // User
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
-  updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
-  deleteUser(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
-  private hardware: Map<number, Hardware>;
-  private credentials: Map<number, Credential>;
-  private networkDevices: Map<number, NetworkDevice>;
-  private vlans: Map<number, Vlan>;
-  private generalInventory: Map<number, GeneralInventoryItem>;
-  private assignments: Map<number, Assignment>;
-  private activityLogs: Map<number, ActivityLog>;
   private users: Map<number, User>;
+  private categories: Map<number, Category>;
+  private products: Map<number, Product>;
+  private suppliers: Map<number, Supplier>;
+  private orders: Map<number, Order>;
+  private orderItems: Map<number, OrderItem[]>;
+  private activities: Activity[];
   
-  private hardwareId: number = 1;
-  private credentialId: number = 1;
-  private networkDeviceId: number = 1;
-  private vlanId: number = 1;
-  private generalInventoryId: number = 1;
-  private assignmentId: number = 1;
-  private activityLogId: number = 1;
-  private userId: number = 1;
+  private currentUserId: number;
+  private currentCategoryId: number;
+  private currentProductId: number;
+  private currentSupplierId: number;
+  private currentOrderId: number;
+  private currentOrderItemId: number;
+  private currentActivityId: number;
 
   constructor() {
-    this.hardware = new Map();
-    this.credentials = new Map();
-    this.networkDevices = new Map();
-    this.vlans = new Map();
-    this.generalInventory = new Map();
-    this.assignments = new Map();
-    this.activityLogs = new Map();
     this.users = new Map();
-
-    // Initialize with a default admin user
-    this.initializeDefaultData();
-  }
-
-  private initializeDefaultData() {
-    // Create default admin user if none exists
-    if (this.users.size === 0) {
-      const now = new Date();
-      const adminUser: User = {
-        id: this.userId++,
-        username: 'admin',
-        password: 'admin123', // In production, this should be properly hashed
-        email: 'admin@itinventory.com',
-        fullName: 'IT Admin',
-        role: 'admin',
-        department: 'IT Department',
-        isActive: true,
-        lastLogin: null,
-        createdAt: now
-      };
-      this.users.set(adminUser.id, adminUser);
-
-      // Create activity log for the admin user creation
-      const logId = this.activityLogId++;
-      const log: ActivityLog = {
-        id: logId,
-        userId: 'system',
-        action: 'add',
-        itemType: 'user',
-        itemId: adminUser.id,
-        details: 'Created default admin user',
-        timestamp: now
-      };
-      this.activityLogs.set(logId, log);
-    }
-  }
-
-  // Hardware methods
-  async getHardware(id: number): Promise<Hardware | undefined> {
-    return this.hardware.get(id);
-  }
-
-  async getAllHardware(): Promise<Hardware[]> {
-    return Array.from(this.hardware.values());
-  }
-
-  async createHardware(hardware: InsertHardware): Promise<Hardware> {
-    const id = this.hardwareId++;
-    const now = new Date();
+    this.categories = new Map();
+    this.products = new Map();
+    this.suppliers = new Map();
+    this.orders = new Map();
+    this.orderItems = new Map();
+    this.activities = [];
     
-    // Create hardware with proper defaults for all required fields
-    const newHardware: Hardware = { 
-      id,
-      name: hardware.name,
-      type: hardware.type,
-      status: hardware.status || 'in_stock',
-      manufacturer: hardware.manufacturer,
-      model: hardware.model,
-      serialNumber: hardware.serialNumber,
-      purchaseDate: hardware.purchaseDate || null,
-      warrantyExpiry: hardware.warrantyExpiry || null,
-      location: hardware.location || null,
-      notes: hardware.notes || null,
-      assignedTo: hardware.assignedTo || null,
-      lastUpdated: now,
-      imageUrl: hardware.imageUrl || null
-    };
+    this.currentUserId = 1;
+    this.currentCategoryId = 1;
+    this.currentProductId = 1;
+    this.currentSupplierId = 1;
+    this.currentOrderId = 1;
+    this.currentOrderItemId = 1;
+    this.currentActivityId = 1;
     
-    this.hardware.set(id, newHardware);
-    return newHardware;
+    // Initialize with some data
+    this.initializeData();
   }
 
-  async updateHardware(id: number, hardware: Partial<InsertHardware>): Promise<Hardware | undefined> {
-    const existingHardware = this.hardware.get(id);
-    if (!existingHardware) return undefined;
+  private initializeData() {
+    // Create categories
+    const electronics = this.createCategory({ name: "Electronics", description: "Electronic devices and gadgets" });
+    const accessories = this.createCategory({ name: "Accessories", description: "Various accessories for devices" });
+    const wearables = this.createCategory({ name: "Wearables", description: "Wearable smart devices" });
+    const audio = this.createCategory({ name: "Audio", description: "Audio equipment and accessories" });
     
-    const updatedHardware: Hardware = { 
-      ...existingHardware, 
-      ...hardware, 
-      lastUpdated: new Date() 
-    };
-    this.hardware.set(id, updatedHardware);
-    return updatedHardware;
-  }
-
-  async deleteHardware(id: number): Promise<boolean> {
-    return this.hardware.delete(id);
-  }
-
-  // Credential methods
-  async getCredential(id: number): Promise<Credential | undefined> {
-    return this.credentials.get(id);
-  }
-
-  async getAllCredentials(): Promise<Credential[]> {
-    return Array.from(this.credentials.values());
-  }
-
-  async createCredential(credential: InsertCredential): Promise<Credential> {
-    const id = this.credentialId++;
-    const now = new Date();
-    
-    // Create credentials with proper defaults for all required fields
-    const newCredential: Credential = { 
-      id,
-      name: credential.name,
-      type: credential.type,
-      username: credential.username,
-      password: credential.password,
-      url: credential.url || null,
-      notes: credential.notes || null,
-      lastUpdated: now,
-      ipAddress: credential.ipAddress || null,
-      expirationDate: credential.expirationDate || null
-    };
-    
-    this.credentials.set(id, newCredential);
-    return newCredential;
-  }
-
-  async updateCredential(id: number, credential: Partial<InsertCredential>): Promise<Credential | undefined> {
-    const existingCredential = this.credentials.get(id);
-    if (!existingCredential) return undefined;
-    
-    const updatedCredential: Credential = { 
-      ...existingCredential, 
-      ...credential, 
-      lastUpdated: new Date() 
-    };
-    this.credentials.set(id, updatedCredential);
-    return updatedCredential;
-  }
-
-  async deleteCredential(id: number): Promise<boolean> {
-    return this.credentials.delete(id);
-  }
-
-  // Network device methods
-  async getNetworkDevice(id: number): Promise<NetworkDevice | undefined> {
-    return this.networkDevices.get(id);
-  }
-
-  async getAllNetworkDevices(): Promise<NetworkDevice[]> {
-    return Array.from(this.networkDevices.values());
-  }
-
-  async createNetworkDevice(device: InsertNetworkDevice): Promise<NetworkDevice> {
-    const id = this.networkDeviceId++;
-    const now = new Date();
-    
-    // Create network device with proper defaults for all required fields
-    const newDevice: NetworkDevice = { 
-      id,
-      name: device.name,
-      type: device.type,
-      manufacturer: device.manufacturer,
-      model: device.model,
-      serialNumber: device.serialNumber,
-      ipAddress: device.ipAddress,
-      macAddress: device.macAddress || null,
-      location: device.location || null,
-      status: device.status || 'in_stock',
-      notes: device.notes || null,
-      purchaseDate: device.purchaseDate || null,
-      lastUpdated: now
-    };
-    
-    this.networkDevices.set(id, newDevice);
-    return newDevice;
-  }
-
-  async updateNetworkDevice(id: number, device: Partial<InsertNetworkDevice>): Promise<NetworkDevice | undefined> {
-    const existingDevice = this.networkDevices.get(id);
-    if (!existingDevice) return undefined;
-    
-    const updatedDevice: NetworkDevice = { 
-      ...existingDevice, 
-      ...device, 
-      lastUpdated: new Date() 
-    };
-    this.networkDevices.set(id, updatedDevice);
-    return updatedDevice;
-  }
-
-  async deleteNetworkDevice(id: number): Promise<boolean> {
-    return this.networkDevices.delete(id);
-  }
-
-  // VLAN methods
-  async getVlan(id: number): Promise<Vlan | undefined> {
-    return this.vlans.get(id);
-  }
-
-  async getAllVlans(): Promise<Vlan[]> {
-    return Array.from(this.vlans.values());
-  }
-
-  async createVlan(vlan: InsertVlan): Promise<Vlan> {
-    const id = this.vlanId++;
-    const now = new Date();
-    
-    // Create VLAN with proper defaults for all required fields
-    const newVlan: Vlan = { 
-      id,
-      vlanId: vlan.vlanId,
-      name: vlan.name,
-      subnet: vlan.subnet,
-      description: vlan.description || null,
-      assignedDevices: vlan.assignedDevices || null,
-      lastUpdated: now
-    };
-    
-    this.vlans.set(id, newVlan);
-    return newVlan;
-  }
-
-  async updateVlan(id: number, vlan: Partial<InsertVlan>): Promise<Vlan | undefined> {
-    const existingVlan = this.vlans.get(id);
-    if (!existingVlan) return undefined;
-    
-    const updatedVlan: Vlan = { 
-      ...existingVlan, 
-      ...vlan, 
-      lastUpdated: new Date() 
-    };
-    this.vlans.set(id, updatedVlan);
-    return updatedVlan;
-  }
-
-  async deleteVlan(id: number): Promise<boolean> {
-    return this.vlans.delete(id);
-  }
-
-  // General inventory methods
-  async getGeneralInventoryItem(id: number): Promise<GeneralInventoryItem | undefined> {
-    return this.generalInventory.get(id);
-  }
-
-  async getAllGeneralInventory(): Promise<GeneralInventoryItem[]> {
-    return Array.from(this.generalInventory.values());
-  }
-
-  async createGeneralInventoryItem(item: InsertGeneralInventoryItem): Promise<GeneralInventoryItem> {
-    const id = this.generalInventoryId++;
-    const now = new Date();
-    
-    // Create general inventory item with proper defaults for all required fields
-    const newItem: GeneralInventoryItem = { 
-      id,
-      name: item.name,
-      category: item.category,
-      description: item.description || null,
-      serialNumber: item.serialNumber || null,
-      quantity: item.quantity || 1,
-      location: item.location || null,
-      status: item.status || 'in_stock',
-      notes: item.notes || null,
-      purchaseDate: item.purchaseDate || null,
-      lastUpdated: now
-    };
-    
-    this.generalInventory.set(id, newItem);
-    return newItem;
-  }
-
-  async updateGeneralInventoryItem(id: number, item: Partial<InsertGeneralInventoryItem>): Promise<GeneralInventoryItem | undefined> {
-    const existingItem = this.generalInventory.get(id);
-    if (!existingItem) return undefined;
-    
-    const updatedItem: GeneralInventoryItem = { 
-      ...existingItem, 
-      ...item, 
-      lastUpdated: new Date() 
-    };
-    this.generalInventory.set(id, updatedItem);
-    return updatedItem;
-  }
-
-  async deleteGeneralInventoryItem(id: number): Promise<boolean> {
-    return this.generalInventory.delete(id);
-  }
-
-  // Assignment methods
-  async getAssignment(id: number): Promise<Assignment | undefined> {
-    return this.assignments.get(id);
-  }
-
-  async getAllAssignments(): Promise<Assignment[]> {
-    return Array.from(this.assignments.values());
-  }
-
-  async createAssignment(assignment: InsertAssignment): Promise<Assignment> {
-    const id = this.assignmentId++;
-    const now = new Date();
-    
-    // Create new assignment with proper defaults for all required fields
-    const newAssignment: Assignment = { 
-      id,
-      assignedTo: assignment.assignedTo,
-      status: assignment.status || 'active',
-      notes: assignment.notes || null,
-      lastUpdated: now,
-      hardwareId: assignment.hardwareId || null,
-      networkDeviceId: assignment.networkDeviceId || null,
-      generalInventoryId: assignment.generalInventoryId || null,
-      department: assignment.department || null,
-      assignmentDate: assignment.assignmentDate || now,
-      returnDate: assignment.returnDate || null
-    };
-    
-    this.assignments.set(id, newAssignment);
-    
-    // Create activity log
-    await this.createActivityLog({
-      userId: 'system',
-      action: 'add',
-      itemType: 'assignment',
-      itemId: id,
-      details: `Created assignment for ${newAssignment.assignedTo}`
+    // Create suppliers
+    const techSupplier = this.createSupplier({ 
+      name: "TechSource Inc.", 
+      contactName: "John Smith", 
+      email: "john@techsource.com", 
+      phone: "555-123-4567", 
+      address: "123 Tech Blvd, Silicon Valley, CA" 
     });
     
-    return newAssignment;
-  }
-
-  async updateAssignment(id: number, assignment: Partial<InsertAssignment>): Promise<Assignment | undefined> {
-    const existingAssignment = this.assignments.get(id);
-    if (!existingAssignment) return undefined;
-    
-    const updatedAssignment: Assignment = { 
-      ...existingAssignment, 
-      ...assignment, 
-      lastUpdated: new Date() 
-    };
-    this.assignments.set(id, updatedAssignment);
-    return updatedAssignment;
-  }
-
-  async deleteAssignment(id: number): Promise<boolean> {
-    return this.assignments.delete(id);
-  }
-
-  // Activity log methods
-  async getActivityLog(id: number): Promise<ActivityLog | undefined> {
-    return this.activityLogs.get(id);
-  }
-
-  async getAllActivityLogs(): Promise<ActivityLog[]> {
-    return Array.from(this.activityLogs.values()).sort((a, b) => {
-      // Sort by timestamp in descending order (newest first)
-      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    this.createSupplier({ 
+      name: "GlobalGadgets", 
+      contactName: "Jane Doe", 
+      email: "jane@globalgadgets.com", 
+      phone: "555-987-6543", 
+      address: "456 Gadget Ave, New York, NY" 
     });
-  }
-
-  async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
-    const id = this.activityLogId++;
-    const now = new Date();
     
-    // Create activity log with proper defaults for all required fields
-    const newLog: ActivityLog = { 
-      id,
-      userId: log.userId,
-      action: log.action,
-      itemType: log.itemType,
-      itemId: log.itemId,
-      details: log.details || null,
-      timestamp: now
-    };
+    // Create products
+    this.createProduct({
+      name: "Laptop Pro 15-inch",
+      sku: "PRD-56789",
+      description: "High-performance laptop with 15-inch display",
+      price: 1299.00,
+      stock: 24,
+      minStockLevel: 10,
+      categoryId: electronics.id,
+      imageUrl: "/laptop.jpg"
+    });
     
-    this.activityLogs.set(id, newLog);
-    return newLog;
+    this.createProduct({
+      name: "Smartphone XS",
+      sku: "PRD-67890",
+      description: "Latest smartphone with advanced features",
+      price: 899.00,
+      stock: 45,
+      minStockLevel: 15,
+      categoryId: electronics.id,
+      imageUrl: "/smartphone.jpg"
+    });
+    
+    this.createProduct({
+      name: "Wireless Headphones",
+      sku: "PRD-12345",
+      description: "Noise-cancelling wireless headphones",
+      price: 199.00,
+      stock: 5,
+      minStockLevel: 10,
+      categoryId: audio.id,
+      imageUrl: "/headphones.jpg"
+    });
+    
+    this.createProduct({
+      name: "Smart Watch",
+      sku: "PRD-98765",
+      description: "Fitness tracking smart watch",
+      price: 249.00,
+      stock: 8,
+      minStockLevel: 15,
+      categoryId: wearables.id,
+      imageUrl: "/smartwatch.jpg"
+    });
+    
+    this.createProduct({
+      name: "USB-C Charging Cable",
+      sku: "PRD-45678",
+      description: "Fast charging USB-C cable",
+      price: 19.99,
+      stock: 12,
+      minStockLevel: 20,
+      categoryId: accessories.id,
+      imageUrl: "/cable.jpg"
+    });
+    
+    this.createProduct({
+      name: "Wireless Charging Pad",
+      sku: "PRD-34567",
+      description: "Qi-compatible wireless charging pad",
+      price: 49.00,
+      stock: 32,
+      minStockLevel: 10,
+      categoryId: accessories.id,
+      imageUrl: "/chargingpad.jpg"
+    });
+    
+    // Create an order
+    const order = this.createOrder({
+      orderNumber: "ORD-2023-8754",
+      supplierId: techSupplier.id,
+      status: "pending"
+    }, []);
+    
+    // Add activities
+    this.createActivity({
+      type: ActivityTypes.PRODUCT_ADDED,
+      description: "New product added: Laptop Pro 15-inch",
+      entityId: 1,
+      entityType: "product"
+    });
+    
+    this.createActivity({
+      type: ActivityTypes.STOCK_UPDATED,
+      description: "Inventory updated for Bluetooth Speakers",
+      entityId: 3,
+      entityType: "product"
+    });
+    
+    this.createActivity({
+      type: ActivityTypes.LOW_STOCK_ALERT,
+      description: "Low stock alert for Wireless Headphones",
+      entityId: 3,
+      entityType: "product"
+    });
+    
+    this.createActivity({
+      type: ActivityTypes.ORDER_PLACED,
+      description: "New order #ORD-2023-8754 placed",
+      entityId: order.id,
+      entityType: "order"
+    });
   }
 
   // User methods
@@ -473,102 +213,254 @@ export class MemStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    for (const user of this.users.values()) {
-      if (user.username.toLowerCase() === username.toLowerCase()) {
-        return user;
-      }
-    }
-    return undefined;
+    return Array.from(this.users.values()).find(
+      (user) => user.username === username,
+    );
   }
 
-  async getAllUsers(): Promise<User[]> {
-    return Array.from(this.users.values());
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = this.currentUserId++;
+    const user: User = { ...insertUser, id };
+    this.users.set(id, user);
+    return user;
   }
 
-  async createUser(user: InsertUser): Promise<User> {
-    const id = this.userId++;
-    const now = new Date();
-    const newUser: User = {
-      id,
-      username: user.username,
-      password: user.password,
-      email: user.email,
-      fullName: user.fullName,
-      role: user.role || 'readonly',
-      department: user.department || null,
-      isActive: user.isActive !== undefined ? user.isActive : true,
-      lastLogin: null,
-      createdAt: now
-    };
-    this.users.set(id, newUser);
+  // Category methods
+  async getCategories(): Promise<Category[]> {
+    return Array.from(this.categories.values());
+  }
+
+  async getCategoryById(id: number): Promise<Category | undefined> {
+    return this.categories.get(id);
+  }
+
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const id = this.currentCategoryId++;
+    const newCategory: Category = { ...category, id };
+    this.categories.set(id, newCategory);
+    return newCategory;
+  }
+
+  // Product methods
+  async getProducts(): Promise<Product[]> {
+    return Array.from(this.products.values());
+  }
+
+  async getProductById(id: number): Promise<Product | undefined> {
+    return this.products.get(id);
+  }
+
+  async getProductsByCategoryId(categoryId: number): Promise<Product[]> {
+    return Array.from(this.products.values()).filter(
+      product => product.categoryId === categoryId
+    );
+  }
+
+  async getLowStockProducts(): Promise<Product[]> {
+    return Array.from(this.products.values()).filter(
+      product => product.stock <= product.minStockLevel
+    );
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const id = this.currentProductId++;
+    const createdAt = new Date();
+    const newProduct: Product = { ...product, id, createdAt };
+    this.products.set(id, newProduct);
     
-    // Create activity log
-    await this.createActivityLog({
-      userId: 'system',
-      action: 'add',
-      itemType: 'user',
-      itemId: id,
-      details: `Added user ${user.username} with role ${user.role}`
+    // Create activity
+    this.createActivity({
+      type: ActivityTypes.PRODUCT_ADDED,
+      description: `New product added: ${product.name}`,
+      entityId: id,
+      entityType: "product"
     });
     
-    return newUser;
+    return newProduct;
   }
 
-  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
-    const user = await this.getUser(id);
-    if (!user) {
-      return undefined;
-    }
-
-    // Handle each field individually to ensure type safety
-    const updatedUser: User = {
-      ...user,
-      username: userData.username !== undefined ? userData.username : user.username,
-      password: userData.password !== undefined ? userData.password : user.password,
-      email: userData.email !== undefined ? userData.email : user.email,
-      fullName: userData.fullName !== undefined ? userData.fullName : user.fullName,
-      role: userData.role !== undefined ? userData.role : user.role,
-      department: userData.department !== undefined ? userData.department : user.department,
-      isActive: userData.isActive !== undefined ? userData.isActive : user.isActive,
-      lastLogin: user.lastLogin,
-      createdAt: user.createdAt,
-      id: user.id
-    };
-
-    this.users.set(id, updatedUser);
+  async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined> {
+    const existingProduct = this.products.get(id);
+    if (!existingProduct) return undefined;
     
-    // Create activity log
-    await this.createActivityLog({
-      userId: 'system',
-      action: 'update',
-      itemType: 'user',
-      itemId: id,
-      details: `Updated user ${user.username}`
+    const updatedProduct = { ...existingProduct, ...product };
+    this.products.set(id, updatedProduct);
+    
+    // Create activity
+    this.createActivity({
+      type: ActivityTypes.PRODUCT_UPDATED,
+      description: `Product updated: ${updatedProduct.name}`,
+      entityId: id,
+      entityType: "product"
     });
     
-    return updatedUser;
+    return updatedProduct;
   }
 
-  async deleteUser(id: number): Promise<boolean> {
-    const user = await this.getUser(id);
-    if (!user) {
-      return false;
-    }
+  async updateProductStock(id: number, newStock: number): Promise<Product | undefined> {
+    const product = this.products.get(id);
+    if (!product) return undefined;
     
-    const success = this.users.delete(id);
+    const updatedProduct = { ...product, stock: newStock };
+    this.products.set(id, updatedProduct);
     
-    if (success) {
-      // Create activity log
-      await this.createActivityLog({
-        userId: 'system',
-        action: 'delete',
-        itemType: 'user',
-        itemId: id,
-        details: `Deleted user ${user.username}`
+    // Create activity
+    this.createActivity({
+      type: ActivityTypes.STOCK_UPDATED,
+      description: `Stock updated for ${product.name}: ${newStock} units`,
+      entityId: id,
+      entityType: "product"
+    });
+    
+    // Check if stock level is low
+    if (newStock <= product.minStockLevel) {
+      this.createActivity({
+        type: ActivityTypes.LOW_STOCK_ALERT,
+        description: `Low stock alert for ${product.name}: ${newStock} units`,
+        entityId: id,
+        entityType: "product"
       });
     }
     
-    return success;
+    return updatedProduct;
+  }
+
+  // Supplier methods
+  async getSuppliers(): Promise<Supplier[]> {
+    return Array.from(this.suppliers.values());
+  }
+
+  async getSupplierById(id: number): Promise<Supplier | undefined> {
+    return this.suppliers.get(id);
+  }
+
+  async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
+    const id = this.currentSupplierId++;
+    const newSupplier: Supplier = { ...supplier, id };
+    this.suppliers.set(id, newSupplier);
+    return newSupplier;
+  }
+
+  // Order methods
+  async getOrders(): Promise<Order[]> {
+    return Array.from(this.orders.values());
+  }
+
+  async getOrderById(id: number): Promise<Order | undefined> {
+    return this.orders.get(id);
+  }
+
+  async getActiveOrders(): Promise<Order[]> {
+    return Array.from(this.orders.values()).filter(
+      order => order.status === "pending"
+    );
+  }
+
+  async createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order> {
+    const id = this.currentOrderId++;
+    const createdAt = new Date();
+    const newOrder: Order = { ...order, id, createdAt };
+    this.orders.set(id, newOrder);
+    
+    // Create order items
+    const orderItems: OrderItem[] = [];
+    for (const item of items) {
+      const itemId = this.currentOrderItemId++;
+      const orderItem: OrderItem = { ...item, id: itemId, orderId: id };
+      orderItems.push(orderItem);
+      
+      // Update product stock when order is received
+      if (order.status === "received") {
+        const product = await this.getProductById(item.productId);
+        if (product) {
+          await this.updateProductStock(product.id, product.stock + item.quantity);
+        }
+      }
+    }
+    
+    this.orderItems.set(id, orderItems);
+    
+    // Create activity
+    this.createActivity({
+      type: ActivityTypes.ORDER_PLACED,
+      description: `New order ${order.orderNumber} placed`,
+      entityId: id,
+      entityType: "order"
+    });
+    
+    return newOrder;
+  }
+
+  async updateOrderStatus(id: number, status: string): Promise<Order | undefined> {
+    const order = this.orders.get(id);
+    if (!order) return undefined;
+    
+    const updatedOrder = { ...order, status };
+    this.orders.set(id, updatedOrder);
+    
+    // Create activity
+    if (status === "received") {
+      // Update product stock when order is received
+      const items = await this.getOrderItems(id);
+      for (const item of items) {
+        const product = await this.getProductById(item.productId);
+        if (product) {
+          await this.updateProductStock(product.id, product.stock + item.quantity);
+        }
+      }
+      
+      this.createActivity({
+        type: ActivityTypes.ORDER_RECEIVED,
+        description: `Order ${order.orderNumber} received`,
+        entityId: id,
+        entityType: "order"
+      });
+    } else if (status === "cancelled") {
+      this.createActivity({
+        type: ActivityTypes.ORDER_CANCELLED,
+        description: `Order ${order.orderNumber} cancelled`,
+        entityId: id,
+        entityType: "order"
+      });
+    }
+    
+    return updatedOrder;
+  }
+
+  async getOrderItems(orderId: number): Promise<OrderItem[]> {
+    return this.orderItems.get(orderId) || [];
+  }
+
+  // Activity methods
+  async getActivities(limit?: number): Promise<Activity[]> {
+    const activities = [...this.activities].sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    
+    return limit ? activities.slice(0, limit) : activities;
+  }
+
+  async createActivity(activity: InsertActivity): Promise<Activity> {
+    const id = this.currentActivityId++;
+    const createdAt = new Date();
+    const newActivity: Activity = { ...activity, id, createdAt };
+    this.activities.push(newActivity);
+    return newActivity;
+  }
+
+  // Dashboard methods
+  async getDashboardStats(): Promise<{ totalProducts: number; lowStockItems: number; activeOrders: number; totalSuppliers: number }> {
+    const products = await this.getProducts();
+    const lowStockProducts = await this.getLowStockProducts();
+    const activeOrders = await this.getActiveOrders();
+    const suppliers = await this.getSuppliers();
+    
+    return {
+      totalProducts: products.length,
+      lowStockItems: lowStockProducts.length,
+      activeOrders: activeOrders.length,
+      totalSuppliers: suppliers.length
+    };
   }
 }
 

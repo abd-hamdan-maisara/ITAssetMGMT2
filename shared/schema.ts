@@ -1,159 +1,127 @@
-import { pgTable, text, serial, integer, boolean, timestamp, varchar, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Status enum for hardware
-export const statusEnum = pgEnum('status', ['in_stock', 'assigned', 'maintenance', 'retired']);
-export const hardwareTypeEnum = pgEnum('type', ['laptop', 'desktop', 'server', 'monitor', 'printer', 'network', 'peripheral', 'other']);
-export const credentialTypeEnum = pgEnum('credential_type', ['network', 'server', 'service', 'database', 'api']);
-export const userRoleEnum = pgEnum('user_role', ['admin', 'manager', 'technician', 'readonly']);
-
-// Hardware table
-export const hardware = pgTable("hardware", {
+export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  type: hardwareTypeEnum("type").notNull(),
-  manufacturer: text("manufacturer").notNull(),
-  model: text("model").notNull(),
-  serialNumber: text("serial_number").notNull().unique(),
-  purchaseDate: timestamp("purchase_date"),
-  warrantyExpiry: timestamp("warranty_expiry"),
-  status: statusEnum("status").notNull().default('in_stock'),
-  location: text("location"),
-  assignedTo: text("assigned_to"), // Could be person or department
-  notes: text("notes"),
-  imageUrl: text("image_url"), // URL to hardware image
-  lastUpdated: timestamp("last_updated").defaultNow()
-});
-
-// Credentials table
-export const credentials = pgTable("credentials", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  type: credentialTypeEnum("type").notNull(),
-  username: text("username").notNull(),
-  password: text("password").notNull(),
-  url: text("url"), // For services or API endpoints
-  ipAddress: text("ip_address"), // For network devices
-  notes: text("notes"),
-  expirationDate: timestamp("expiration_date"),
-  lastUpdated: timestamp("last_updated").defaultNow()
-});
-
-// Network Devices table
-export const networkDevices = pgTable("network_devices", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  type: text("type").notNull(), // router, switch, firewall, etc.
-  manufacturer: text("manufacturer").notNull(),
-  model: text("model").notNull(),
-  serialNumber: text("serial_number").notNull().unique(),
-  ipAddress: text("ip_address").notNull(),
-  macAddress: text("mac_address"),
-  location: text("location"),
-  status: statusEnum("status").notNull().default('in_stock'),
-  notes: text("notes"),
-  purchaseDate: timestamp("purchase_date"),
-  lastUpdated: timestamp("last_updated").defaultNow()
-});
-
-// VLANs table
-export const vlans = pgTable("vlans", {
-  id: serial("id").primaryKey(),
-  vlanId: integer("vlan_id").notNull().unique(),
-  name: text("name").notNull(),
-  subnet: text("subnet").notNull(),
+  name: text("name").notNull().unique(),
   description: text("description"),
-  assignedDevices: text("assigned_devices"),
-  lastUpdated: timestamp("last_updated").defaultNow()
 });
 
-// General Inventory items table
-export const generalInventory = pgTable("general_inventory", {
+export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  category: text("category").notNull(), // storage, AV, peripheral, etc.
+  sku: text("sku").notNull().unique(),
   description: text("description"),
-  serialNumber: text("serial_number"),
-  quantity: integer("quantity").notNull().default(1),
-  location: text("location"),
-  status: statusEnum("status").notNull().default('in_stock'),
-  notes: text("notes"),
-  purchaseDate: timestamp("purchase_date"),
-  lastUpdated: timestamp("last_updated").defaultNow()
+  price: doublePrecision("price").notNull(),
+  stock: integer("stock").notNull().default(0),
+  minStockLevel: integer("min_stock_level").default(10),
+  categoryId: integer("category_id").references(() => categories.id),
+  imageUrl: text("image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Assignments table
-export const assignments = pgTable("assignments", {
+export const suppliers = pgTable("suppliers", {
   id: serial("id").primaryKey(),
-  hardwareId: integer("hardware_id"),
-  networkDeviceId: integer("network_device_id"),
-  generalInventoryId: integer("general_inventory_id"),
-  assignedTo: text("assigned_to").notNull(),
-  department: text("department"),
-  assignmentDate: timestamp("assignment_date").defaultNow().notNull(),
-  returnDate: timestamp("return_date"),
-  status: text("status").notNull().default('active'), // active, returned, pending
-  notes: text("notes"),
-  lastUpdated: timestamp("last_updated").defaultNow()
+  name: text("name").notNull(),
+  contactName: text("contact_name"),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
 });
 
-// User table
-export const users = pgTable("users", {
+export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  email: text("email").notNull().unique(),
-  fullName: text("full_name").notNull(),
-  role: userRoleEnum("role").notNull().default('readonly'),
-  department: text("department"),
-  isActive: boolean("is_active").notNull().default(true),
-  lastLogin: timestamp("last_login"),
-  createdAt: timestamp("created_at").defaultNow().notNull()
+  orderNumber: text("order_number").notNull().unique(),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
+  status: text("status").notNull().default("pending"), // pending, received, cancelled
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Activity log table
-export const activityLogs = pgTable("activity_logs", {
+export const orderItems = pgTable("order_items", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull(),
-  action: text("action").notNull(), // add, edit, delete, assign, etc.
-  itemType: text("item_type").notNull(), // hardware, credential, network, etc.
-  itemId: integer("item_id").notNull(),
-  details: text("details"),
-  timestamp: timestamp("timestamp").defaultNow().notNull()
+  orderId: integer("order_id").references(() => orders.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  quantity: integer("quantity").notNull(),
+  price: doublePrecision("price").notNull(),
+});
+
+export const activities = pgTable("activities", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(), // product_added, order_placed, stock_updated, etc
+  description: text("description").notNull(),
+  entityId: integer("entity_id"), // ID of related entity (product, order, etc)
+  entityType: text("entity_type"), // product, order, etc
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Insert schemas
-export const insertHardwareSchema = createInsertSchema(hardware).omit({ id: true, lastUpdated: true });
-export const insertCredentialSchema = createInsertSchema(credentials).omit({ id: true, lastUpdated: true });
-export const insertNetworkDeviceSchema = createInsertSchema(networkDevices).omit({ id: true, lastUpdated: true });
-export const insertVlanSchema = createInsertSchema(vlans).omit({ id: true, lastUpdated: true });
-export const insertGeneralInventorySchema = createInsertSchema(generalInventory).omit({ id: true, lastUpdated: true });
-export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true, lastUpdated: true });
-export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true, timestamp: true });
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, lastLogin: true, createdAt: true });
+export const insertCategorySchema = createInsertSchema(categories).omit({ id: true });
+export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true });
+export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true });
+export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: true });
+export const insertActivitySchema = createInsertSchema(activities).omit({ id: true, createdAt: true });
 
 // Types
-export type Hardware = typeof hardware.$inferSelect;
-export type InsertHardware = z.infer<typeof insertHardwareSchema>;
+export type Category = typeof categories.$inferSelect;
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
 
-export type Credential = typeof credentials.$inferSelect;
-export type InsertCredential = z.infer<typeof insertCredentialSchema>;
+export type Product = typeof products.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;
 
-export type NetworkDevice = typeof networkDevices.$inferSelect;
-export type InsertNetworkDevice = z.infer<typeof insertNetworkDeviceSchema>;
+export type Supplier = typeof suppliers.$inferSelect;
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 
-export type Vlan = typeof vlans.$inferSelect;
-export type InsertVlan = z.infer<typeof insertVlanSchema>;
+export type Order = typeof orders.$inferSelect;
+export type InsertOrder = z.infer<typeof insertOrderSchema>;
 
+export type OrderItem = typeof orderItems.$inferSelect;
+export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
+
+export type Activity = typeof activities.$inferSelect;
+export type InsertActivity = z.infer<typeof insertActivitySchema>;
+
+// Enum for activity types
+export const ActivityTypes = {
+  PRODUCT_ADDED: "product_added",
+  PRODUCT_UPDATED: "product_updated",
+  STOCK_UPDATED: "stock_updated",
+  ORDER_PLACED: "order_placed",
+  ORDER_RECEIVED: "order_received",
+  ORDER_CANCELLED: "order_cancelled",
+  LOW_STOCK_ALERT: "low_stock_alert",
+} as const;
+
+// Enum for order status
+export const OrderStatus = {
+  PENDING: "pending",
+  RECEIVED: "received",
+  CANCELLED: "cancelled",
+} as const;
+
+// Dashboard stats type
+export type DashboardStats = {
+  totalProducts: number;
+  lowStockItems: number;
+  activeOrders: number;
+  totalSuppliers: number;
+};
+
+// General Inventory schema
+export const generalInventory = pgTable("general_inventory", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  category: text("category").notNull(), // storage, audio/visual, peripherals, networking, etc
+  serialNumber: text("serial_number"),
+  description: text("description"),
+  location: text("location"),
+  status: text("status").notNull().default("available"), // available, in-use, maintenance, retired
+  purchaseDate: timestamp("purchase_date"),
+  warranty: text("warranty"),
+  notes: text("notes"),
+});
+
+export const insertGeneralInventorySchema = createInsertSchema(generalInventory).omit({ id: true });
 export type GeneralInventoryItem = typeof generalInventory.$inferSelect;
 export type InsertGeneralInventoryItem = z.infer<typeof insertGeneralInventorySchema>;
-
-export type Assignment = typeof assignments.$inferSelect;
-export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
-
-export type ActivityLog = typeof activityLogs.$inferSelect;
-export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
-
-export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;

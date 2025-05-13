@@ -1,746 +1,281 @@
-import type { Express, Request, Response } from "express";
+import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { insertProductSchema, insertCategorySchema, insertSupplierSchema, insertOrderSchema } from "@shared/schema";
 import { z } from "zod";
-import { insertHardwareSchema, insertCredentialSchema, insertNetworkDeviceSchema, insertVlanSchema, insertGeneralInventorySchema, insertAssignmentSchema, insertActivityLogSchema, insertUserSchema } from "@shared/schema";
-import { setupAuth, checkRole } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup authentication
-  setupAuth(app);
-  
-  // prefix all routes with /api
-  const apiRouter = app;
-
-  // Role definitions for middleware
-  const ADMIN_ROLES = ["admin"];
-  const MANAGER_ROLES = ["admin", "manager"];
-  const TECH_ROLES = ["admin", "manager", "technician"];
-
-  // Hardware routes
-  apiRouter.get("/api/hardware", async (req: Request, res: Response) => {
+  // Dashboard routes
+  app.get("/api/dashboard/stats", async (req, res) => {
     try {
-      const hardware = await storage.getAllHardware();
-      res.json(hardware);
+      const stats = await storage.getDashboardStats();
+      res.json(stats);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch hardware inventory" });
+      res.status(500).json({ message: "Failed to fetch dashboard stats" });
     }
   });
 
-  apiRouter.get("/api/hardware/:id", async (req: Request, res: Response) => {
+  // Category routes
+  app.get("/api/categories", async (req, res) => {
+    try {
+      const categories = await storage.getCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch categories" });
+    }
+  });
+
+  app.get("/api/categories/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const hardware = await storage.getHardware(id);
-      if (!hardware) {
-        return res.status(404).json({ error: "Hardware not found" });
+      const category = await storage.getCategoryById(id);
+      
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
       }
-      res.json(hardware);
+      
+      res.json(category);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch hardware" });
+      res.status(500).json({ message: "Failed to fetch category" });
     }
   });
 
-  apiRouter.post("/api/hardware", async (req: Request, res: Response) => {
+  app.post("/api/categories", async (req, res) => {
     try {
-      const validatedData = insertHardwareSchema.parse(req.body);
-      const newHardware = await storage.createHardware(validatedData);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin", // In a real app, this would be the authenticated user
-        action: "add",
-        itemType: "hardware",
-        itemId: newHardware.id,
-        details: `Added ${newHardware.name} to hardware inventory`
-      });
-      
-      res.status(201).json(newHardware);
+      const categoryData = insertCategorySchema.parse(req.body);
+      const category = await storage.createCategory(categoryData);
+      res.status(201).json(category);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
+        return res.status(400).json({ message: "Invalid category data", errors: error.errors });
       }
-      res.status(500).json({ error: "Failed to create hardware" });
+      res.status(500).json({ message: "Failed to create category" });
     }
   });
 
-  apiRouter.put("/api/hardware/:id", async (req: Request, res: Response) => {
+  // Product routes
+  app.get("/api/products", async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const existingHardware = await storage.getHardware(id);
-      if (!existingHardware) {
-        return res.status(404).json({ error: "Hardware not found" });
+      const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : undefined;
+      
+      let products;
+      if (categoryId) {
+        products = await storage.getProductsByCategoryId(categoryId);
+      } else {
+        products = await storage.getProducts();
       }
       
-      const validatedData = insertHardwareSchema.partial().parse(req.body);
-      const updatedHardware = await storage.updateHardware(id, validatedData);
+      res.json(products);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
+  app.get("/api/products/low-stock", async (req, res) => {
+    try {
+      const products = await storage.getLowStockProducts();
+      res.json(products);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch low stock products" });
+    }
+  });
+
+  app.get("/api/products/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const product = await storage.getProductById(id);
       
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin", // In a real app, this would be the authenticated user
-        action: "update",
-        itemType: "hardware",
-        itemId: id,
-        details: `Updated ${updatedHardware?.name} in hardware inventory`
-      });
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
       
-      res.json(updatedHardware);
+      res.json(product);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch product" });
+    }
+  });
+
+  app.post("/api/products", async (req, res) => {
+    try {
+      const productData = insertProductSchema.parse(req.body);
+      const product = await storage.createProduct(productData);
+      res.status(201).json(product);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
+        return res.status(400).json({ message: "Invalid product data", errors: error.errors });
       }
-      res.status(500).json({ error: "Failed to update hardware" });
+      res.status(500).json({ message: "Failed to create product" });
     }
   });
 
-  apiRouter.delete("/api/hardware/:id", async (req: Request, res: Response) => {
+  app.patch("/api/products/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const hardware = await storage.getHardware(id);
-      if (!hardware) {
-        return res.status(404).json({ error: "Hardware not found" });
+      const productData = req.body;
+      
+      const product = await storage.updateProduct(id, productData);
+      
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
       }
       
-      await storage.deleteHardware(id);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin", // In a real app, this would be the authenticated user
-        action: "delete",
-        itemType: "hardware",
-        itemId: id,
-        details: `Deleted ${hardware.name} from hardware inventory`
-      });
-      
-      res.status(204).send();
+      res.json(product);
     } catch (error) {
-      res.status(500).json({ error: "Failed to delete hardware" });
+      res.status(500).json({ message: "Failed to update product" });
     }
   });
 
-  // Credential routes
-  apiRouter.get("/api/credentials", async (req: Request, res: Response) => {
-    try {
-      const credentials = await storage.getAllCredentials();
-      res.json(credentials);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch credentials" });
-    }
-  });
-
-  apiRouter.get("/api/credentials/:id", async (req: Request, res: Response) => {
+  app.patch("/api/products/:id/stock", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const credential = await storage.getCredential(id);
-      if (!credential) {
-        return res.status(404).json({ error: "Credential not found" });
+      const { stock } = req.body;
+      
+      if (typeof stock !== 'number') {
+        return res.status(400).json({ message: "Stock must be a number" });
       }
-      res.json(credential);
+      
+      const product = await storage.updateProductStock(id, stock);
+      
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      
+      res.json(product);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch credential" });
+      res.status(500).json({ message: "Failed to update product stock" });
     }
   });
 
-  apiRouter.post("/api/credentials", async (req: Request, res: Response) => {
+  // Supplier routes
+  app.get("/api/suppliers", async (req, res) => {
     try {
-      const validatedData = insertCredentialSchema.parse(req.body);
-      const newCredential = await storage.createCredential(validatedData);
+      const suppliers = await storage.getSuppliers();
+      res.json(suppliers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch suppliers" });
+    }
+  });
+
+  app.get("/api/suppliers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const supplier = await storage.getSupplierById(id);
       
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "add",
-        itemType: "credential",
-        itemId: newCredential.id,
-        details: `Added ${newCredential.name} to credentials`
-      });
+      if (!supplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
       
-      res.status(201).json(newCredential);
+      res.json(supplier);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch supplier" });
+    }
+  });
+
+  app.post("/api/suppliers", async (req, res) => {
+    try {
+      const supplierData = insertSupplierSchema.parse(req.body);
+      const supplier = await storage.createSupplier(supplierData);
+      res.status(201).json(supplier);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
+        return res.status(400).json({ message: "Invalid supplier data", errors: error.errors });
       }
-      res.status(500).json({ error: "Failed to create credential" });
+      res.status(500).json({ message: "Failed to create supplier" });
     }
   });
 
-  apiRouter.put("/api/credentials/:id", async (req: Request, res: Response) => {
+  // Order routes
+  app.get("/api/orders", async (req, res) => {
+    try {
+      const orders = await storage.getOrders();
+      res.json(orders);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch orders" });
+    }
+  });
+
+  app.get("/api/orders/active", async (req, res) => {
+    try {
+      const orders = await storage.getActiveOrders();
+      res.json(orders);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch active orders" });
+    }
+  });
+
+  app.get("/api/orders/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const existingCredential = await storage.getCredential(id);
-      if (!existingCredential) {
-        return res.status(404).json({ error: "Credential not found" });
+      const order = await storage.getOrderById(id);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
       }
       
-      const validatedData = insertCredentialSchema.partial().parse(req.body);
-      const updatedCredential = await storage.updateCredential(id, validatedData);
+      res.json(order);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch order" });
+    }
+  });
+
+  app.get("/api/orders/:id/items", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const orderItems = await storage.getOrderItems(id);
+      res.json(orderItems);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch order items" });
+    }
+  });
+
+  app.post("/api/orders", async (req, res) => {
+    try {
+      const { order, items } = req.body;
       
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "update",
-        itemType: "credential",
-        itemId: id,
-        details: `Updated ${updatedCredential?.name} in credentials`
-      });
+      const orderData = insertOrderSchema.parse(order);
+      const newOrder = await storage.createOrder(orderData, items);
       
-      res.json(updatedCredential);
+      res.status(201).json(newOrder);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
+        return res.status(400).json({ message: "Invalid order data", errors: error.errors });
       }
-      res.status(500).json({ error: "Failed to update credential" });
+      res.status(500).json({ message: "Failed to create order" });
     }
   });
 
-  apiRouter.delete("/api/credentials/:id", async (req: Request, res: Response) => {
+  app.patch("/api/orders/:id/status", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const credential = await storage.getCredential(id);
-      if (!credential) {
-        return res.status(404).json({ error: "Credential not found" });
+      const { status } = req.body;
+      
+      if (typeof status !== 'string') {
+        return res.status(400).json({ message: "Status must be a string" });
       }
       
-      await storage.deleteCredential(id);
+      const order = await storage.updateOrderStatus(id, status);
       
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "delete",
-        itemType: "credential",
-        itemId: id,
-        details: `Deleted ${credential.name} from credentials`
-      });
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
       
-      res.status(204).send();
+      res.json(order);
     } catch (error) {
-      res.status(500).json({ error: "Failed to delete credential" });
+      res.status(500).json({ message: "Failed to update order status" });
     }
   });
 
-  // Network device routes
-  apiRouter.get("/api/network-devices", async (req: Request, res: Response) => {
+  // Activity routes
+  app.get("/api/activities", async (req, res) => {
     try {
-      const devices = await storage.getAllNetworkDevices();
-      res.json(devices);
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const activities = await storage.getActivities(limit);
+      res.json(activities);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch network devices" });
+      res.status(500).json({ message: "Failed to fetch activities" });
     }
   });
 
-  apiRouter.get("/api/network-devices/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const device = await storage.getNetworkDevice(id);
-      if (!device) {
-        return res.status(404).json({ error: "Network device not found" });
-      }
-      res.json(device);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch network device" });
-    }
-  });
-
-  apiRouter.post("/api/network-devices", async (req: Request, res: Response) => {
-    try {
-      const validatedData = insertNetworkDeviceSchema.parse(req.body);
-      const newDevice = await storage.createNetworkDevice(validatedData);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "add",
-        itemType: "network_device",
-        itemId: newDevice.id,
-        details: `Added ${newDevice.name} to network devices`
-      });
-      
-      res.status(201).json(newDevice);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
-      }
-      res.status(500).json({ error: "Failed to create network device" });
-    }
-  });
-
-  apiRouter.put("/api/network-devices/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const existingDevice = await storage.getNetworkDevice(id);
-      if (!existingDevice) {
-        return res.status(404).json({ error: "Network device not found" });
-      }
-      
-      const validatedData = insertNetworkDeviceSchema.partial().parse(req.body);
-      const updatedDevice = await storage.updateNetworkDevice(id, validatedData);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "update",
-        itemType: "network_device",
-        itemId: id,
-        details: `Updated ${updatedDevice?.name} in network devices`
-      });
-      
-      res.json(updatedDevice);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
-      }
-      res.status(500).json({ error: "Failed to update network device" });
-    }
-  });
-
-  apiRouter.delete("/api/network-devices/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const device = await storage.getNetworkDevice(id);
-      if (!device) {
-        return res.status(404).json({ error: "Network device not found" });
-      }
-      
-      await storage.deleteNetworkDevice(id);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "delete",
-        itemType: "network_device",
-        itemId: id,
-        details: `Deleted ${device.name} from network devices`
-      });
-      
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ error: "Failed to delete network device" });
-    }
-  });
-
-  // VLAN routes
-  apiRouter.get("/api/vlans", async (req: Request, res: Response) => {
-    try {
-      const vlans = await storage.getAllVlans();
-      res.json(vlans);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch VLANs" });
-    }
-  });
-
-  apiRouter.get("/api/vlans/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const vlan = await storage.getVlan(id);
-      if (!vlan) {
-        return res.status(404).json({ error: "VLAN not found" });
-      }
-      res.json(vlan);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch VLAN" });
-    }
-  });
-
-  apiRouter.post("/api/vlans", async (req: Request, res: Response) => {
-    try {
-      const validatedData = insertVlanSchema.parse(req.body);
-      const newVlan = await storage.createVlan(validatedData);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "add",
-        itemType: "vlan",
-        itemId: newVlan.id,
-        details: `Added VLAN ${newVlan.name} (ID: ${newVlan.vlanId})`
-      });
-      
-      res.status(201).json(newVlan);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
-      }
-      res.status(500).json({ error: "Failed to create VLAN" });
-    }
-  });
-
-  apiRouter.put("/api/vlans/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const existingVlan = await storage.getVlan(id);
-      if (!existingVlan) {
-        return res.status(404).json({ error: "VLAN not found" });
-      }
-      
-      const validatedData = insertVlanSchema.partial().parse(req.body);
-      const updatedVlan = await storage.updateVlan(id, validatedData);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "update",
-        itemType: "vlan",
-        itemId: id,
-        details: `Updated VLAN ${updatedVlan?.name} (ID: ${updatedVlan?.vlanId})`
-      });
-      
-      res.json(updatedVlan);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
-      }
-      res.status(500).json({ error: "Failed to update VLAN" });
-    }
-  });
-
-  apiRouter.delete("/api/vlans/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const vlan = await storage.getVlan(id);
-      if (!vlan) {
-        return res.status(404).json({ error: "VLAN not found" });
-      }
-      
-      await storage.deleteVlan(id);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "delete",
-        itemType: "vlan",
-        itemId: id,
-        details: `Deleted VLAN ${vlan.name} (ID: ${vlan.vlanId})`
-      });
-      
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ error: "Failed to delete VLAN" });
-    }
-  });
-
-  // General inventory routes
-  apiRouter.get("/api/general-inventory", async (req: Request, res: Response) => {
-    try {
-      const items = await storage.getAllGeneralInventory();
-      res.json(items);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch general inventory" });
-    }
-  });
-
-  apiRouter.get("/api/general-inventory/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const item = await storage.getGeneralInventoryItem(id);
-      if (!item) {
-        return res.status(404).json({ error: "Item not found" });
-      }
-      res.json(item);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch item" });
-    }
-  });
-
-  apiRouter.post("/api/general-inventory", async (req: Request, res: Response) => {
-    try {
-      const validatedData = insertGeneralInventorySchema.parse(req.body);
-      const newItem = await storage.createGeneralInventoryItem(validatedData);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "add",
-        itemType: "general_inventory",
-        itemId: newItem.id,
-        details: `Added ${newItem.name} to general inventory`
-      });
-      
-      res.status(201).json(newItem);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
-      }
-      res.status(500).json({ error: "Failed to create general inventory item" });
-    }
-  });
-
-  apiRouter.put("/api/general-inventory/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const existingItem = await storage.getGeneralInventoryItem(id);
-      if (!existingItem) {
-        return res.status(404).json({ error: "Item not found" });
-      }
-      
-      const validatedData = insertGeneralInventorySchema.partial().parse(req.body);
-      const updatedItem = await storage.updateGeneralInventoryItem(id, validatedData);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "update",
-        itemType: "general_inventory",
-        itemId: id,
-        details: `Updated ${updatedItem?.name} in general inventory`
-      });
-      
-      res.json(updatedItem);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
-      }
-      res.status(500).json({ error: "Failed to update general inventory item" });
-    }
-  });
-
-  apiRouter.delete("/api/general-inventory/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const item = await storage.getGeneralInventoryItem(id);
-      if (!item) {
-        return res.status(404).json({ error: "Item not found" });
-      }
-      
-      await storage.deleteGeneralInventoryItem(id);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "delete",
-        itemType: "general_inventory",
-        itemId: id,
-        details: `Deleted ${item.name} from general inventory`
-      });
-      
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ error: "Failed to delete general inventory item" });
-    }
-  });
-
-  // Assignment routes
-  apiRouter.get("/api/assignments", async (req: Request, res: Response) => {
-    try {
-      const assignments = await storage.getAllAssignments();
-      res.json(assignments);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch assignments" });
-    }
-  });
-
-  apiRouter.get("/api/assignments/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const assignment = await storage.getAssignment(id);
-      if (!assignment) {
-        return res.status(404).json({ error: "Assignment not found" });
-      }
-      res.json(assignment);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch assignment" });
-    }
-  });
-
-  apiRouter.post("/api/assignments", async (req: Request, res: Response) => {
-    try {
-      const validatedData = insertAssignmentSchema.parse(req.body);
-      const newAssignment = await storage.createAssignment(validatedData);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "assign",
-        itemType: "assignment",
-        itemId: newAssignment.id,
-        details: `Created new assignment to ${newAssignment.assignedTo}`
-      });
-      
-      res.status(201).json(newAssignment);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
-      }
-      res.status(500).json({ error: "Failed to create assignment" });
-    }
-  });
-
-  apiRouter.put("/api/assignments/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const existingAssignment = await storage.getAssignment(id);
-      if (!existingAssignment) {
-        return res.status(404).json({ error: "Assignment not found" });
-      }
-      
-      const validatedData = insertAssignmentSchema.partial().parse(req.body);
-      const updatedAssignment = await storage.updateAssignment(id, validatedData);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "update",
-        itemType: "assignment",
-        itemId: id,
-        details: `Updated assignment to ${updatedAssignment?.assignedTo}`
-      });
-      
-      res.json(updatedAssignment);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
-      }
-      res.status(500).json({ error: "Failed to update assignment" });
-    }
-  });
-
-  apiRouter.delete("/api/assignments/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const assignment = await storage.getAssignment(id);
-      if (!assignment) {
-        return res.status(404).json({ error: "Assignment not found" });
-      }
-      
-      await storage.deleteAssignment(id);
-      
-      // Log the activity
-      await storage.createActivityLog({
-        userId: "admin",
-        action: "delete",
-        itemType: "assignment",
-        itemId: id,
-        details: `Deleted assignment to ${assignment.assignedTo}`
-      });
-      
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ error: "Failed to delete assignment" });
-    }
-  });
-
-  // Activity log routes
-  apiRouter.get("/api/activity-logs", async (req: Request, res: Response) => {
-    try {
-      const logs = await storage.getAllActivityLogs();
-      res.json(logs);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch activity logs" });
-    }
-  });
-
-  apiRouter.get("/api/activity-logs/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const log = await storage.getActivityLog(id);
-      if (!log) {
-        return res.status(404).json({ error: "Activity log not found" });
-      }
-      res.json(log);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch activity log" });
-    }
-  });
-
-  // User management routes
-  apiRouter.get("/api/users", async (req: Request, res: Response) => {
-    try {
-      const users = await storage.getAllUsers();
-      // Remove passwords from response
-      const sanitizedUsers = users.map(({ password, ...rest }) => rest);
-      res.json(sanitizedUsers);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch users" });
-    }
-  });
-
-  apiRouter.get("/api/users/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const user = await storage.getUser(id);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      // Remove password from response
-      const { password, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch user" });
-    }
-  });
-
-  apiRouter.post("/api/users", async (req: Request, res: Response) => {
-    try {
-      const validatedData = insertUserSchema.parse(req.body);
-      
-      // Check if username already exists
-      const existingUser = await storage.getUserByUsername(validatedData.username);
-      if (existingUser) {
-        return res.status(400).json({ error: "Username already exists" });
-      }
-      
-      const newUser = await storage.createUser(validatedData);
-      
-      // Remove password from response
-      const { password, ...userWithoutPassword } = newUser;
-      res.status(201).json(userWithoutPassword);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
-      }
-      res.status(500).json({ error: "Failed to create user" });
-    }
-  });
-
-  apiRouter.put("/api/users/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const existingUser = await storage.getUser(id);
-      if (!existingUser) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      
-      const validatedData = insertUserSchema.partial().parse(req.body);
-      
-      // If username is being changed, check if new username already exists
-      if (validatedData.username && validatedData.username !== existingUser.username) {
-        const userWithSameUsername = await storage.getUserByUsername(validatedData.username);
-        if (userWithSameUsername) {
-          return res.status(400).json({ error: "Username already exists" });
-        }
-      }
-      
-      const updatedUser = await storage.updateUser(id, validatedData);
-      
-      // Remove password from response
-      const { password, ...userWithoutPassword } = updatedUser!;
-      res.json(userWithoutPassword);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors });
-      }
-      res.status(500).json({ error: "Failed to update user" });
-    }
-  });
-
-  apiRouter.delete("/api/users/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const user = await storage.getUser(id);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      
-      const success = await storage.deleteUser(id);
-      if (!success) {
-        return res.status(500).json({ error: "Failed to delete user" });
-      }
-      
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ error: "Failed to delete user" });
-    }
-  });
-
-  // Create HTTP server
   const httpServer = createServer(app);
   return httpServer;
 }
