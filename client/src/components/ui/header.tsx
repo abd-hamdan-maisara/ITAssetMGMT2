@@ -40,7 +40,7 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 z-10">
+    <header className="bg-primary text-primary-foreground border-b border-primary/20 z-10">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
@@ -48,7 +48,7 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
               variant="ghost"
               size="icon"
               onClick={() => setSidebarOpen(!sidebarOpen)} 
-              className="lg:hidden"
+              className="lg:hidden text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
               aria-label={sidebarOpen ? "Close sidebar menu" : "Open sidebar menu"}
             >
               <Menu className="h-5 w-5" />
@@ -75,7 +75,7 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowNotifications(!showNotifications)} 
-                className="relative"
+                className="relative text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
                 aria-label="Notifications"
                 aria-expanded={showNotifications}
                 aria-haspopup="true"
@@ -124,17 +124,17 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
               {/* User Dropdown */}
               {showUserMenu && (
                 <div 
-                  className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50"
+                  className="absolute right-0 mt-2 w-48 bg-background border border-border rounded-md shadow-lg py-1 z-50"
                   onClick={() => setShowUserMenu(false)}
                 >
-                  <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <a href="#" className="block px-4 py-2 text-sm text-foreground hover:bg-muted">
                     Your Profile
                   </a>
-                  <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <a href="#" className="block px-4 py-2 text-sm text-foreground hover:bg-muted">
                     Settings
                   </a>
-                  <div className="border-t border-gray-100 my-1"></div>
-                  <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <div className="border-t border-border my-1"></div>
+                  <a href="#" className="block px-4 py-2 text-sm text-destructive hover:bg-destructive/10">
                     Sign out
                   </a>
                 </div>
