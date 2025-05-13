@@ -1,6 +1,18 @@
 import { Activity, ActivityTypes } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
-import { CheckCircle, AlertTriangle, ShoppingCart, TruckIcon, Plus, RefreshCcw } from "lucide-react";
+import { 
+  CheckCircle, 
+  AlertTriangle, 
+  ShoppingCart, 
+  TruckIcon, 
+  Plus, 
+  RefreshCcw, 
+  LogIn, 
+  LogOut, 
+  Users, 
+  Wifi, 
+  Key 
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ActivityListProps {
@@ -10,16 +22,26 @@ interface ActivityListProps {
 export function ActivityList({ activities }: ActivityListProps) {
   const getActivityIcon = (type: string) => {
     switch (type) {
-      case ActivityTypes.PRODUCT_ADDED:
+      case ActivityTypes.HARDWARE_ADDED:
         return <Plus className="text-primary p-1 rounded-full text-sm" />;
-      case ActivityTypes.STOCK_UPDATED:
+      case ActivityTypes.HARDWARE_UPDATED:
         return <RefreshCcw className="text-green-500 p-1 rounded-full text-sm" />;
-      case ActivityTypes.LOW_STOCK_ALERT:
+      case ActivityTypes.HARDWARE_RETIRED:
         return <AlertTriangle className="text-amber-500 p-1 rounded-full text-sm" />;
-      case ActivityTypes.ORDER_PLACED:
+      case ActivityTypes.REQUEST_CREATED:
         return <ShoppingCart className="text-primary p-1 rounded-full text-sm" />;
-      case ActivityTypes.ORDER_RECEIVED:
+      case ActivityTypes.REQUEST_RESOLVED:
         return <TruckIcon className="text-blue-500 p-1 rounded-full text-sm" />;
+      case ActivityTypes.USER_LOGIN:
+        return <LogIn className="text-green-500 p-1 rounded-full text-sm" />;
+      case ActivityTypes.USER_LOGOUT:
+        return <LogOut className="text-blue-500 p-1 rounded-full text-sm" />;
+      case ActivityTypes.ASSIGNMENT_CREATED:
+        return <Users className="text-indigo-500 p-1 rounded-full text-sm" />;
+      case ActivityTypes.NETWORK_DEVICE_ADDED:
+        return <Wifi className="text-purple-500 p-1 rounded-full text-sm" />;
+      case ActivityTypes.CREDENTIAL_ADDED:
+        return <Key className="text-amber-500 p-1 rounded-full text-sm" />;
       default:
         return <CheckCircle className="text-primary p-1 rounded-full text-sm" />;
     }
@@ -27,16 +49,23 @@ export function ActivityList({ activities }: ActivityListProps) {
 
   const getActivityIconBackground = (type: string) => {
     switch (type) {
-      case ActivityTypes.PRODUCT_ADDED:
+      case ActivityTypes.HARDWARE_ADDED:
+      case ActivityTypes.HARDWARE_UPDATED:
         return "bg-primary bg-opacity-20";
-      case ActivityTypes.STOCK_UPDATED:
+      case ActivityTypes.USER_LOGIN:
+      case ActivityTypes.USER_LOGOUT:
         return "bg-green-500 bg-opacity-20";
-      case ActivityTypes.LOW_STOCK_ALERT:
+      case ActivityTypes.HARDWARE_RETIRED:
+      case ActivityTypes.CREDENTIAL_ADDED:
         return "bg-amber-500 bg-opacity-20";
-      case ActivityTypes.ORDER_PLACED:
+      case ActivityTypes.REQUEST_CREATED:
         return "bg-primary bg-opacity-20";
-      case ActivityTypes.ORDER_RECEIVED:
+      case ActivityTypes.REQUEST_RESOLVED:
         return "bg-blue-500 bg-opacity-20";
+      case ActivityTypes.ASSIGNMENT_CREATED:
+        return "bg-indigo-500 bg-opacity-20";
+      case ActivityTypes.NETWORK_DEVICE_ADDED:
+        return "bg-purple-500 bg-opacity-20";
       default:
         return "bg-primary bg-opacity-20";
     }
@@ -60,13 +89,19 @@ export function ActivityList({ activities }: ActivityListProps) {
         <li key={activity.id} className="px-4 py-3">
           <div className="flex space-x-3">
             <div className="flex-shrink-0">
-              <div className={cn("flex items-center justify-center rounded-full", getActivityIconBackground(activity.type))}>
-                {getActivityIcon(activity.type)}
+              <div className={cn("flex items-center justify-center rounded-full", getActivityIconBackground(activity.action))}>
+                {getActivityIcon(activity.action)}
               </div>
             </div>
             <div>
-              <p className="text-sm">{activity.description}</p>
-              <p className="text-xs text-gray-500">{formatTimeAgo(activity.createdAt)}</p>
+              <p className="text-sm">
+                {activity.details && typeof activity.details === 'object' 
+                  ? JSON.stringify(activity.details) 
+                  : `Activity: ${activity.action}`}
+              </p>
+              <p className="text-xs text-gray-500">
+                {activity.createdAt ? formatTimeAgo(activity.createdAt) : 'Recently'}
+              </p>
             </div>
           </div>
         </li>

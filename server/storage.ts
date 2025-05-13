@@ -1,467 +1,556 @@
-import { activities, categories, orderItems, orders, products, suppliers, type Activity, type Category, type InsertActivity, type InsertCategory, type InsertOrder, type InsertOrderItem, type InsertProduct, type InsertSupplier, type Order, type OrderItem, type Product, type Supplier, ActivityTypes } from "@shared/schema";
+import { db } from "./db";
+import { User, users, Hardware, hardware, NetworkDevice, networkDevices, 
+         Vlan, vlans, Credential, credentials, Assignment, assignments,
+         Request, requests, RequestComment, requestComments,
+         Activity, activities,
+         InsertUser, InsertHardware, InsertNetworkDevice, InsertVlan, 
+         InsertCredential, InsertAssignment, InsertRequest, 
+         InsertRequestComment, InsertActivity, DashboardStats,
+         HardwareStatus, NetworkDeviceStatus, RequestStatus, 
+         AssignmentStatus } from "@shared/schema";
+import { eq, desc, asc, and, isNull, isNotNull, count } from "drizzle-orm";
+import connectPgSimple from "connect-pg-simple";
+import session from "express-session";
+import { pool } from "./db";
+
+// Define PostgreSQL session store
+const PostgresSessionStore = connectPgSimple(session);
 
 export interface IStorage {
-  // Categories
-  getCategories(): Promise<Category[]>;
-  getCategoryById(id: number): Promise<Category | undefined>;
-  createCategory(category: InsertCategory): Promise<Category>;
+  // Session store
+  sessionStore: session.Store;
   
-  // Products
-  getProducts(): Promise<Product[]>;
-  getProductById(id: number): Promise<Product | undefined>;
-  getProductsByCategoryId(categoryId: number): Promise<Product[]>;
-  getLowStockProducts(): Promise<Product[]>;
-  createProduct(product: InsertProduct): Promise<Product>;
-  updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined>;
-  updateProductStock(id: number, newStock: number): Promise<Product | undefined>;
-  
-  // Suppliers
-  getSuppliers(): Promise<Supplier[]>;
-  getSupplierById(id: number): Promise<Supplier | undefined>;
-  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
-  
-  // Orders
-  getOrders(): Promise<Order[]>;
-  getOrderById(id: number): Promise<Order | undefined>;
-  getActiveOrders(): Promise<Order[]>;
-  createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
-  updateOrderStatus(id: number, status: string): Promise<Order | undefined>;
-  getOrderItems(orderId: number): Promise<OrderItem[]>;
-  
-  // Activities
-  getActivities(limit?: number): Promise<Activity[]>;
-  createActivity(activity: InsertActivity): Promise<Activity>;
-  
-  // Dashboard
-  getDashboardStats(): Promise<{ totalProducts: number; lowStockItems: number; activeOrders: number; totalSuppliers: number }>;
-  
-  // User
+  // Users
+  getUsers(): Promise<User[]>;
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined>;
+  
+  // Hardware
+  getHardware(): Promise<Hardware[]>;
+  getHardwareById(id: number): Promise<Hardware | undefined>;
+  getHardwareByStatus(status: string): Promise<Hardware[]>;
+  createHardware(hardware: InsertHardware): Promise<Hardware>;
+  updateHardware(id: number, hardwareData: Partial<InsertHardware>): Promise<Hardware | undefined>;
+  
+  // Network Devices
+  getNetworkDevices(): Promise<NetworkDevice[]>;
+  getNetworkDeviceById(id: number): Promise<NetworkDevice | undefined>;
+  createNetworkDevice(device: InsertNetworkDevice): Promise<NetworkDevice>;
+  updateNetworkDevice(id: number, deviceData: Partial<InsertNetworkDevice>): Promise<NetworkDevice | undefined>;
+  
+  // VLANs
+  getVlans(): Promise<Vlan[]>;
+  getVlanById(id: number): Promise<Vlan | undefined>;
+  createVlan(vlan: InsertVlan): Promise<Vlan>;
+  updateVlan(id: number, vlanData: Partial<InsertVlan>): Promise<Vlan | undefined>;
+  
+  // Credentials
+  getCredentials(): Promise<Credential[]>;
+  getCredentialById(id: number): Promise<Credential | undefined>;
+  getCredentialsByType(type: string): Promise<Credential[]>;
+  createCredential(credential: InsertCredential): Promise<Credential>;
+  updateCredential(id: number, credentialData: Partial<InsertCredential>): Promise<Credential | undefined>;
+  
+  // Assignments
+  getAssignments(): Promise<Assignment[]>;
+  getAssignmentById(id: number): Promise<Assignment | undefined>;
+  getAssignmentsByUserId(userId: number): Promise<Assignment[]>;
+  getAssignmentsByHardwareId(hardwareId: number): Promise<Assignment[]>;
+  getActiveAssignments(): Promise<Assignment[]>;
+  createAssignment(assignment: InsertAssignment): Promise<Assignment>;
+  updateAssignment(id: number, assignmentData: Partial<InsertAssignment>): Promise<Assignment | undefined>;
+  
+  // Requests
+  getRequests(): Promise<Request[]>;
+  getRequestById(id: number): Promise<Request | undefined>;
+  getRequestsByStatus(status: string): Promise<Request[]>;
+  getRequestsByUser(userId: number): Promise<Request[]>;
+  createRequest(request: InsertRequest): Promise<Request>;
+  updateRequest(id: number, requestData: Partial<InsertRequest>): Promise<Request | undefined>;
+  
+  // Request Comments
+  getRequestComments(requestId: number): Promise<RequestComment[]>;
+  createRequestComment(comment: InsertRequestComment): Promise<RequestComment>;
+  
+  // Activities
+  getActivities(limit?: number): Promise<Activity[]>;
+  getActivitiesByEntityType(entityType: string, entityId?: number): Promise<Activity[]>;
+  createActivity(activity: InsertActivity): Promise<Activity>;
+  
+  // Dashboard
+  getDashboardStats(): Promise<DashboardStats>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private categories: Map<number, Category>;
-  private products: Map<number, Product>;
-  private suppliers: Map<number, Supplier>;
-  private orders: Map<number, Order>;
-  private orderItems: Map<number, OrderItem[]>;
-  private activities: Activity[];
+export class DatabaseStorage implements IStorage {
+  sessionStore: session.Store;
   
-  private currentUserId: number;
-  private currentCategoryId: number;
-  private currentProductId: number;
-  private currentSupplierId: number;
-  private currentOrderId: number;
-  private currentOrderItemId: number;
-  private currentActivityId: number;
-
   constructor() {
-    this.users = new Map();
-    this.categories = new Map();
-    this.products = new Map();
-    this.suppliers = new Map();
-    this.orders = new Map();
-    this.orderItems = new Map();
-    this.activities = [];
-    
-    this.currentUserId = 1;
-    this.currentCategoryId = 1;
-    this.currentProductId = 1;
-    this.currentSupplierId = 1;
-    this.currentOrderId = 1;
-    this.currentOrderItemId = 1;
-    this.currentActivityId = 1;
-    
-    // Initialize with some data
-    this.initializeData();
-  }
-
-  private initializeData() {
-    // Create categories
-    const electronics = this.createCategory({ name: "Electronics", description: "Electronic devices and gadgets" });
-    const accessories = this.createCategory({ name: "Accessories", description: "Various accessories for devices" });
-    const wearables = this.createCategory({ name: "Wearables", description: "Wearable smart devices" });
-    const audio = this.createCategory({ name: "Audio", description: "Audio equipment and accessories" });
-    
-    // Create suppliers
-    const techSupplier = this.createSupplier({ 
-      name: "TechSource Inc.", 
-      contactName: "John Smith", 
-      email: "john@techsource.com", 
-      phone: "555-123-4567", 
-      address: "123 Tech Blvd, Silicon Valley, CA" 
-    });
-    
-    this.createSupplier({ 
-      name: "GlobalGadgets", 
-      contactName: "Jane Doe", 
-      email: "jane@globalgadgets.com", 
-      phone: "555-987-6543", 
-      address: "456 Gadget Ave, New York, NY" 
-    });
-    
-    // Create products
-    this.createProduct({
-      name: "Laptop Pro 15-inch",
-      sku: "PRD-56789",
-      description: "High-performance laptop with 15-inch display",
-      price: 1299.00,
-      stock: 24,
-      minStockLevel: 10,
-      categoryId: electronics.id,
-      imageUrl: "/laptop.jpg"
-    });
-    
-    this.createProduct({
-      name: "Smartphone XS",
-      sku: "PRD-67890",
-      description: "Latest smartphone with advanced features",
-      price: 899.00,
-      stock: 45,
-      minStockLevel: 15,
-      categoryId: electronics.id,
-      imageUrl: "/smartphone.jpg"
-    });
-    
-    this.createProduct({
-      name: "Wireless Headphones",
-      sku: "PRD-12345",
-      description: "Noise-cancelling wireless headphones",
-      price: 199.00,
-      stock: 5,
-      minStockLevel: 10,
-      categoryId: audio.id,
-      imageUrl: "/headphones.jpg"
-    });
-    
-    this.createProduct({
-      name: "Smart Watch",
-      sku: "PRD-98765",
-      description: "Fitness tracking smart watch",
-      price: 249.00,
-      stock: 8,
-      minStockLevel: 15,
-      categoryId: wearables.id,
-      imageUrl: "/smartwatch.jpg"
-    });
-    
-    this.createProduct({
-      name: "USB-C Charging Cable",
-      sku: "PRD-45678",
-      description: "Fast charging USB-C cable",
-      price: 19.99,
-      stock: 12,
-      minStockLevel: 20,
-      categoryId: accessories.id,
-      imageUrl: "/cable.jpg"
-    });
-    
-    this.createProduct({
-      name: "Wireless Charging Pad",
-      sku: "PRD-34567",
-      description: "Qi-compatible wireless charging pad",
-      price: 49.00,
-      stock: 32,
-      minStockLevel: 10,
-      categoryId: accessories.id,
-      imageUrl: "/chargingpad.jpg"
-    });
-    
-    // Create an order
-    const order = this.createOrder({
-      orderNumber: "ORD-2023-8754",
-      supplierId: techSupplier.id,
-      status: "pending"
-    }, []);
-    
-    // Add activities
-    this.createActivity({
-      type: ActivityTypes.PRODUCT_ADDED,
-      description: "New product added: Laptop Pro 15-inch",
-      entityId: 1,
-      entityType: "product"
-    });
-    
-    this.createActivity({
-      type: ActivityTypes.STOCK_UPDATED,
-      description: "Inventory updated for Bluetooth Speakers",
-      entityId: 3,
-      entityType: "product"
-    });
-    
-    this.createActivity({
-      type: ActivityTypes.LOW_STOCK_ALERT,
-      description: "Low stock alert for Wireless Headphones",
-      entityId: 3,
-      entityType: "product"
-    });
-    
-    this.createActivity({
-      type: ActivityTypes.ORDER_PLACED,
-      description: "New order #ORD-2023-8754 placed",
-      entityId: order.id,
-      entityType: "order"
+    this.sessionStore = new PostgresSessionStore({ 
+      pool,
+      createTableIfMissing: true
     });
   }
-
-  // User methods
+  
+  // Users
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(asc(users.fullName));
+  }
+  
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
   }
-
+  
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const result = await db.select().from(users).where(eq(users.username, username));
+    return result[0];
   }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  
+  async createUser(user: InsertUser): Promise<User> {
+    const result = await db.insert(users).values(user).returning();
+    return result[0];
   }
-
-  // Category methods
-  async getCategories(): Promise<Category[]> {
-    return Array.from(this.categories.values());
+  
+  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set(userData)
+      .where(eq(users.id, id))
+      .returning();
+    return result[0];
   }
-
-  async getCategoryById(id: number): Promise<Category | undefined> {
-    return this.categories.get(id);
+  
+  // Hardware
+  async getHardware(): Promise<Hardware[]> {
+    return await db.select().from(hardware).orderBy(asc(hardware.name));
   }
-
-  async createCategory(category: InsertCategory): Promise<Category> {
-    const id = this.currentCategoryId++;
-    const newCategory: Category = { ...category, id };
-    this.categories.set(id, newCategory);
-    return newCategory;
+  
+  async getHardwareById(id: number): Promise<Hardware | undefined> {
+    const result = await db.select().from(hardware).where(eq(hardware.id, id));
+    return result[0];
   }
-
-  // Product methods
-  async getProducts(): Promise<Product[]> {
-    return Array.from(this.products.values());
+  
+  async getHardwareByStatus(status: string): Promise<Hardware[]> {
+    return await db.select().from(hardware)
+      .where(eq(hardware.status, status))
+      .orderBy(asc(hardware.name));
   }
-
-  async getProductById(id: number): Promise<Product | undefined> {
-    return this.products.get(id);
-  }
-
-  async getProductsByCategoryId(categoryId: number): Promise<Product[]> {
-    return Array.from(this.products.values()).filter(
-      product => product.categoryId === categoryId
-    );
-  }
-
-  async getLowStockProducts(): Promise<Product[]> {
-    return Array.from(this.products.values()).filter(
-      product => product.stock <= product.minStockLevel
-    );
-  }
-
-  async createProduct(product: InsertProduct): Promise<Product> {
-    const id = this.currentProductId++;
-    const createdAt = new Date();
-    const newProduct: Product = { ...product, id, createdAt };
-    this.products.set(id, newProduct);
+  
+  async createHardware(hardwareItem: InsertHardware): Promise<Hardware> {
+    const result = await db.insert(hardware).values(hardwareItem).returning();
     
-    // Create activity
-    this.createActivity({
-      type: ActivityTypes.PRODUCT_ADDED,
-      description: `New product added: ${product.name}`,
-      entityId: id,
-      entityType: "product"
+    // Create activity log
+    await this.createActivity({
+      action: "hardware_added",
+      entityId: result[0].id,
+      entityType: "hardware",
+      details: { name: result[0].name, type: result[0].type }
     });
     
-    return newProduct;
+    return result[0];
   }
-
-  async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined> {
-    const existingProduct = this.products.get(id);
-    if (!existingProduct) return undefined;
-    
-    const updatedProduct = { ...existingProduct, ...product };
-    this.products.set(id, updatedProduct);
-    
-    // Create activity
-    this.createActivity({
-      type: ActivityTypes.PRODUCT_UPDATED,
-      description: `Product updated: ${updatedProduct.name}`,
-      entityId: id,
-      entityType: "product"
-    });
-    
-    return updatedProduct;
-  }
-
-  async updateProductStock(id: number, newStock: number): Promise<Product | undefined> {
-    const product = this.products.get(id);
-    if (!product) return undefined;
-    
-    const updatedProduct = { ...product, stock: newStock };
-    this.products.set(id, updatedProduct);
-    
-    // Create activity
-    this.createActivity({
-      type: ActivityTypes.STOCK_UPDATED,
-      description: `Stock updated for ${product.name}: ${newStock} units`,
-      entityId: id,
-      entityType: "product"
-    });
-    
-    // Check if stock level is low
-    if (newStock <= product.minStockLevel) {
-      this.createActivity({
-        type: ActivityTypes.LOW_STOCK_ALERT,
-        description: `Low stock alert for ${product.name}: ${newStock} units`,
+  
+  async updateHardware(id: number, hardwareData: Partial<InsertHardware>): Promise<Hardware | undefined> {
+    const result = await db.update(hardware)
+      .set(hardwareData)
+      .where(eq(hardware.id, id))
+      .returning();
+      
+    if (result[0]) {
+      // Create activity log
+      await this.createActivity({
+        action: "hardware_updated",
         entityId: id,
-        entityType: "product"
+        entityType: "hardware",
+        details: { name: result[0].name, updates: Object.keys(hardwareData) }
       });
     }
     
-    return updatedProduct;
+    return result[0];
   }
-
-  // Supplier methods
-  async getSuppliers(): Promise<Supplier[]> {
-    return Array.from(this.suppliers.values());
+  
+  // Network Devices
+  async getNetworkDevices(): Promise<NetworkDevice[]> {
+    return await db.select().from(networkDevices).orderBy(asc(networkDevices.name));
   }
-
-  async getSupplierById(id: number): Promise<Supplier | undefined> {
-    return this.suppliers.get(id);
+  
+  async getNetworkDeviceById(id: number): Promise<NetworkDevice | undefined> {
+    const result = await db.select().from(networkDevices).where(eq(networkDevices.id, id));
+    return result[0];
   }
-
-  async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
-    const id = this.currentSupplierId++;
-    const newSupplier: Supplier = { ...supplier, id };
-    this.suppliers.set(id, newSupplier);
-    return newSupplier;
-  }
-
-  // Order methods
-  async getOrders(): Promise<Order[]> {
-    return Array.from(this.orders.values());
-  }
-
-  async getOrderById(id: number): Promise<Order | undefined> {
-    return this.orders.get(id);
-  }
-
-  async getActiveOrders(): Promise<Order[]> {
-    return Array.from(this.orders.values()).filter(
-      order => order.status === "pending"
-    );
-  }
-
-  async createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order> {
-    const id = this.currentOrderId++;
-    const createdAt = new Date();
-    const newOrder: Order = { ...order, id, createdAt };
-    this.orders.set(id, newOrder);
+  
+  async createNetworkDevice(device: InsertNetworkDevice): Promise<NetworkDevice> {
+    const result = await db.insert(networkDevices).values(device).returning();
     
-    // Create order items
-    const orderItems: OrderItem[] = [];
-    for (const item of items) {
-      const itemId = this.currentOrderItemId++;
-      const orderItem: OrderItem = { ...item, id: itemId, orderId: id };
-      orderItems.push(orderItem);
+    // Create activity log
+    await this.createActivity({
+      action: "network_device_added",
+      entityId: result[0].id,
+      entityType: "network_device",
+      details: { name: result[0].name, type: result[0].type }
+    });
+    
+    return result[0];
+  }
+  
+  async updateNetworkDevice(id: number, deviceData: Partial<InsertNetworkDevice>): Promise<NetworkDevice | undefined> {
+    const result = await db.update(networkDevices)
+      .set(deviceData)
+      .where(eq(networkDevices.id, id))
+      .returning();
       
-      // Update product stock when order is received
-      if (order.status === "received") {
-        const product = await this.getProductById(item.productId);
-        if (product) {
-          await this.updateProductStock(product.id, product.stock + item.quantity);
-        }
+    if (result[0]) {
+      // Create activity log
+      await this.createActivity({
+        action: "network_device_updated",
+        entityId: id,
+        entityType: "network_device",
+        details: { name: result[0].name, updates: Object.keys(deviceData) }
+      });
+    }
+    
+    return result[0];
+  }
+  
+  // VLANs
+  async getVlans(): Promise<Vlan[]> {
+    return await db.select().from(vlans).orderBy(asc(vlans.vlanId));
+  }
+  
+  async getVlanById(id: number): Promise<Vlan | undefined> {
+    const result = await db.select().from(vlans).where(eq(vlans.id, id));
+    return result[0];
+  }
+  
+  async createVlan(vlan: InsertVlan): Promise<Vlan> {
+    const result = await db.insert(vlans).values(vlan).returning();
+    
+    // Create activity log
+    await this.createActivity({
+      action: "vlan_added",
+      entityId: result[0].id,
+      entityType: "vlan",
+      details: { name: result[0].name, vlanId: result[0].vlanId }
+    });
+    
+    return result[0];
+  }
+  
+  async updateVlan(id: number, vlanData: Partial<InsertVlan>): Promise<Vlan | undefined> {
+    const result = await db.update(vlans)
+      .set(vlanData)
+      .where(eq(vlans.id, id))
+      .returning();
+      
+    if (result[0]) {
+      // Create activity log
+      await this.createActivity({
+        action: "vlan_updated",
+        entityId: id,
+        entityType: "vlan",
+        details: { name: result[0].name, updates: Object.keys(vlanData) }
+      });
+    }
+    
+    return result[0];
+  }
+  
+  // Credentials
+  async getCredentials(): Promise<Credential[]> {
+    return await db.select().from(credentials).orderBy(asc(credentials.name));
+  }
+  
+  async getCredentialById(id: number): Promise<Credential | undefined> {
+    const result = await db.select().from(credentials).where(eq(credentials.id, id));
+    return result[0];
+  }
+  
+  async getCredentialsByType(type: string): Promise<Credential[]> {
+    return await db.select().from(credentials)
+      .where(eq(credentials.type, type))
+      .orderBy(asc(credentials.name));
+  }
+  
+  async createCredential(credential: InsertCredential): Promise<Credential> {
+    const result = await db.insert(credentials).values(credential).returning();
+    
+    // Create activity log
+    await this.createActivity({
+      action: "credential_added",
+      entityId: result[0].id,
+      entityType: "credential",
+      details: { name: result[0].name, type: result[0].type }
+    });
+    
+    return result[0];
+  }
+  
+  async updateCredential(id: number, credentialData: Partial<InsertCredential>): Promise<Credential | undefined> {
+    const result = await db.update(credentials)
+      .set(credentialData)
+      .where(eq(credentials.id, id))
+      .returning();
+      
+    if (result[0]) {
+      // Create activity log
+      await this.createActivity({
+        action: "credential_updated",
+        entityId: id,
+        entityType: "credential",
+        details: { name: result[0].name, updates: Object.keys(credentialData) }
+      });
+    }
+    
+    return result[0];
+  }
+  
+  // Assignments
+  async getAssignments(): Promise<Assignment[]> {
+    return await db.select().from(assignments).orderBy(desc(assignments.assignedDate));
+  }
+  
+  async getAssignmentById(id: number): Promise<Assignment | undefined> {
+    const result = await db.select().from(assignments).where(eq(assignments.id, id));
+    return result[0];
+  }
+  
+  async getAssignmentsByUserId(userId: number): Promise<Assignment[]> {
+    return await db.select().from(assignments)
+      .where(eq(assignments.userId, userId))
+      .orderBy(desc(assignments.assignedDate));
+  }
+  
+  async getAssignmentsByHardwareId(hardwareId: number): Promise<Assignment[]> {
+    return await db.select().from(assignments)
+      .where(eq(assignments.hardwareId, hardwareId))
+      .orderBy(desc(assignments.assignedDate));
+  }
+  
+  async getActiveAssignments(): Promise<Assignment[]> {
+    return await db.select().from(assignments)
+      .where(eq(assignments.status, AssignmentStatus.ACTIVE))
+      .orderBy(desc(assignments.assignedDate));
+  }
+  
+  async createAssignment(assignment: InsertAssignment): Promise<Assignment> {
+    const result = await db.insert(assignments).values(assignment).returning();
+    
+    // Update hardware status to assigned
+    await db.update(hardware)
+      .set({ status: HardwareStatus.ASSIGNED })
+      .where(eq(hardware.id, assignment.hardwareId));
+    
+    // Create activity log
+    await this.createActivity({
+      action: "equipment_assigned",
+      entityId: result[0].id,
+      entityType: "assignment",
+      details: {
+        userId: result[0].userId,
+        hardwareId: result[0].hardwareId
+      }
+    });
+    
+    return result[0];
+  }
+  
+  async updateAssignment(id: number, assignmentData: Partial<InsertAssignment>): Promise<Assignment | undefined> {
+    const result = await db.update(assignments)
+      .set(assignmentData)
+      .where(eq(assignments.id, id))
+      .returning();
+      
+    if (result[0]) {
+      // If returned date is set, update hardware status to available
+      if (assignmentData.returnedDate && assignmentData.status === AssignmentStatus.RETURNED) {
+        await db.update(hardware)
+          .set({ status: HardwareStatus.AVAILABLE })
+          .where(eq(hardware.id, result[0].hardwareId));
+          
+        // Create activity log for return
+        await this.createActivity({
+          action: "equipment_returned",
+          entityId: id,
+          entityType: "assignment",
+          details: {
+            userId: result[0].userId,
+            hardwareId: result[0].hardwareId
+          }
+        });
       }
     }
     
-    this.orderItems.set(id, orderItems);
+    return result[0];
+  }
+  
+  // Requests
+  async getRequests(): Promise<Request[]> {
+    return await db.select().from(requests).orderBy(desc(requests.createdAt));
+  }
+  
+  async getRequestById(id: number): Promise<Request | undefined> {
+    const result = await db.select().from(requests).where(eq(requests.id, id));
+    return result[0];
+  }
+  
+  async getRequestsByStatus(status: string): Promise<Request[]> {
+    return await db.select().from(requests)
+      .where(eq(requests.status, status))
+      .orderBy(desc(requests.createdAt));
+  }
+  
+  async getRequestsByUser(userId: number): Promise<Request[]> {
+    return await db.select().from(requests)
+      .where(eq(requests.requesterId, userId))
+      .orderBy(desc(requests.createdAt));
+  }
+  
+  async createRequest(request: InsertRequest): Promise<Request> {
+    const result = await db.insert(requests).values(request).returning();
     
-    // Create activity
-    this.createActivity({
-      type: ActivityTypes.ORDER_PLACED,
-      description: `New order ${order.orderNumber} placed`,
-      entityId: id,
-      entityType: "order"
+    // Create activity log
+    await this.createActivity({
+      action: "request_submitted",
+      userId: request.requesterId,
+      entityId: result[0].id,
+      entityType: "request",
+      details: { title: result[0].title, priority: result[0].priority }
     });
     
-    return newOrder;
+    return result[0];
   }
-
-  async updateOrderStatus(id: number, status: string): Promise<Order | undefined> {
-    const order = this.orders.get(id);
-    if (!order) return undefined;
+  
+  async updateRequest(id: number, requestData: Partial<InsertRequest>): Promise<Request | undefined> {
+    // Get original request for comparison
+    const originalRequest = await this.getRequestById(id);
+    if (!originalRequest) return undefined;
     
-    const updatedOrder = { ...order, status };
-    this.orders.set(id, updatedOrder);
+    // Add updated timestamp
+    const updateData = { ...requestData, updatedAt: new Date() };
     
-    // Create activity
-    if (status === "received") {
-      // Update product stock when order is received
-      const items = await this.getOrderItems(id);
-      for (const item of items) {
-        const product = await this.getProductById(item.productId);
-        if (product) {
-          await this.updateProductStock(product.id, product.stock + item.quantity);
+    // If status changed to resolved, add resolved timestamp
+    if (requestData.status === RequestStatus.RESOLVED && originalRequest.status !== RequestStatus.RESOLVED) {
+      // Using as any to bypass TypeScript's type checking for this property
+      (updateData as any).resolvedAt = new Date();
+    }
+    
+    const result = await db.update(requests)
+      .set(updateData)
+      .where(eq(requests.id, id))
+      .returning();
+      
+    if (result[0]) {
+      // Create activity log with appropriate action
+      let action = "request_updated";
+      if (requestData.status && requestData.status !== originalRequest.status) {
+        if (requestData.status === RequestStatus.IN_PROGRESS) {
+          action = "request_started";
+        } else if (requestData.status === RequestStatus.RESOLVED) {
+          action = "request_resolved";
+        } else if (requestData.status === RequestStatus.CLOSED) {
+          action = "request_closed";
         }
       }
       
-      this.createActivity({
-        type: ActivityTypes.ORDER_RECEIVED,
-        description: `Order ${order.orderNumber} received`,
+      await this.createActivity({
+        action,
+        userId: requestData.assigneeId || originalRequest.assigneeId,
         entityId: id,
-        entityType: "order"
-      });
-    } else if (status === "cancelled") {
-      this.createActivity({
-        type: ActivityTypes.ORDER_CANCELLED,
-        description: `Order ${order.orderNumber} cancelled`,
-        entityId: id,
-        entityType: "order"
+        entityType: "request",
+        details: { 
+          title: originalRequest.title,
+          updates: Object.keys(requestData),
+          newStatus: requestData.status
+        }
       });
     }
     
-    return updatedOrder;
+    return result[0];
   }
-
-  async getOrderItems(orderId: number): Promise<OrderItem[]> {
-    return this.orderItems.get(orderId) || [];
+  
+  // Request Comments
+  async getRequestComments(requestId: number): Promise<RequestComment[]> {
+    return await db.select().from(requestComments)
+      .where(eq(requestComments.requestId, requestId))
+      .orderBy(asc(requestComments.createdAt));
   }
-
-  // Activity methods
+  
+  async createRequestComment(comment: InsertRequestComment): Promise<RequestComment> {
+    const result = await db.insert(requestComments).values(comment).returning();
+    
+    // Create activity log
+    await this.createActivity({
+      action: "comment_added",
+      userId: comment.userId,
+      entityId: comment.requestId,
+      entityType: "request",
+      details: { commentId: result[0].id }
+    });
+    
+    return result[0];
+  }
+  
+  // Activities
   async getActivities(limit?: number): Promise<Activity[]> {
-    const activities = [...this.activities].sort((a, b) => {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+    const query = db.select().from(activities).orderBy(desc(activities.createdAt));
     
-    return limit ? activities.slice(0, limit) : activities;
+    if (limit) {
+      query.limit(limit);
+    }
+    
+    return await query;
   }
-
+  
+  async getActivitiesByEntityType(entityType: string, entityId?: number): Promise<Activity[]> {
+    // Create conditions array
+    const conditions = [eq(activities.entityType, entityType)];
+    
+    // Add entityId condition if provided
+    if (entityId) {
+      conditions.push(eq(activities.entityId, entityId));
+    }
+    
+    // Use and() to combine conditions
+    const query = db.select().from(activities)
+      .where(and(...conditions))
+      .orderBy(desc(activities.createdAt));
+    
+    return await query;
+  }
+  
   async createActivity(activity: InsertActivity): Promise<Activity> {
-    const id = this.currentActivityId++;
-    const createdAt = new Date();
-    const newActivity: Activity = { ...activity, id, createdAt };
-    this.activities.push(newActivity);
-    return newActivity;
+    const result = await db.insert(activities).values(activity).returning();
+    return result[0];
   }
-
-  // Dashboard methods
-  async getDashboardStats(): Promise<{ totalProducts: number; lowStockItems: number; activeOrders: number; totalSuppliers: number }> {
-    const products = await this.getProducts();
-    const lowStockProducts = await this.getLowStockProducts();
-    const activeOrders = await this.getActiveOrders();
-    const suppliers = await this.getSuppliers();
+  
+  // Dashboard
+  async getDashboardStats(): Promise<DashboardStats> {
+    // Get total hardware count
+    const totalHardwareResult = await db.select({ count: count() }).from(hardware);
+    const totalHardware = totalHardwareResult[0].count;
+    
+    // Get assigned hardware count
+    const assignedHardwareResult = await db.select({ count: count() }).from(hardware)
+      .where(eq(hardware.status, HardwareStatus.ASSIGNED));
+    const assignedHardware = assignedHardwareResult[0].count;
+    
+    // Get open requests count
+    const openRequestsResult = await db.select({ count: count() }).from(requests)
+      .where(eq(requests.status, RequestStatus.OPEN));
+    const openRequests = openRequestsResult[0].count;
+    
+    // Get network devices count
+    const networkDevicesResult = await db.select({ count: count() }).from(networkDevices);
+    const networkDevicesCount = networkDevicesResult[0].count;
     
     return {
-      totalProducts: products.length,
-      lowStockItems: lowStockProducts.length,
-      activeOrders: activeOrders.length,
-      totalSuppliers: suppliers.length
+      totalHardware,
+      assignedHardware,
+      openRequests,
+      networkDevices: networkDevicesCount
     };
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
