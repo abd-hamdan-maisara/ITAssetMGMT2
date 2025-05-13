@@ -35,19 +35,19 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
   return (
     <aside 
       className={cn(
-        "bg-white transition-all duration-300 transform flex flex-col flex-shrink-0 w-64 fixed inset-y-0 z-30 lg:static lg:translate-x-0 shadow-md",
+        "bg-card border-r border-border transition-all duration-300 transform flex flex-col flex-shrink-0 w-64 fixed inset-y-0 z-30 lg:static lg:translate-x-0 shadow-md",
         open ? "translate-x-0" : "-translate-x-full"
       )}
       aria-label="Main Navigation"
     >
-      <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
+      <div className="flex items-center justify-between h-16 px-4 border-b border-border">
         <div className="flex items-center space-x-2" aria-label="IT Management System">
           <HardwareIcon className="text-primary h-8 w-8" />
           <span className="font-bold text-xl">ITManager</span>
         </div>
         <button 
           onClick={() => setOpen(false)} 
-          className="p-1 rounded-md text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary lg:hidden"
+          className="p-1 rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary lg:hidden"
           aria-label="Close sidebar"
         >
           <X className="h-5 w-5" />
@@ -181,7 +181,7 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
         </Link>
       </nav>
       
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-border">
         <div className="flex items-center">
           <Avatar>
             <AvatarImage src="https://github.com/shadcn.png" alt="User profile" />
@@ -189,7 +189,7 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
           </Avatar>
           <div className="ml-3">
             <p className="text-sm font-medium">System Administrator</p>
-            <p className="text-xs text-gray-500">IT Department</p>
+            <p className="text-xs text-muted-foreground">IT Department</p>
           </div>
         </div>
       </div>
