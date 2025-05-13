@@ -72,26 +72,26 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
   return (
     <div 
       ref={panelRef}
-      className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg py-1 z-50 max-h-[70vh] overflow-y-auto"
+      className="absolute right-0 mt-2 w-80 bg-card text-card-foreground rounded-md shadow-lg py-1 z-50 max-h-[70vh] overflow-y-auto border border-border"
       aria-labelledby="notifications-heading"
     >
-      <div className="px-4 py-2 border-b border-gray-200">
+      <div className="px-4 py-2 border-b border-border">
         <div className="flex justify-between items-center">
           <h3 id="notifications-heading" className="text-sm font-semibold">Notifications</h3>
-          <button className="text-xs text-primary hover:text-primary-dark">Mark all as read</button>
+          <button className="text-xs text-primary hover:text-primary/80">Mark all as read</button>
         </div>
       </div>
       
       {notifications.length === 0 ? (
         <div className="p-4 text-center">
-          <p className="text-gray-500">No notifications</p>
+          <p className="text-muted-foreground">No notifications</p>
         </div>
       ) : (
         notifications.map((notification) => (
           <a
             key={notification.id}
             href="#"
-            className="block px-4 py-3 hover:bg-gray-50 border-b border-gray-100"
+            className="block px-4 py-3 hover:bg-muted/50 border-b border-border"
             onClick={(e) => e.preventDefault()}
           >
             <div className="flex items-start">
@@ -100,8 +100,8 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium">{notification.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
-                <p className="text-xs text-gray-500">{notification.description}</p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-muted-foreground">{notification.description}</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">
                   {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
                 </p>
               </div>
