@@ -31,7 +31,7 @@ import {
   FileDown,
   AlertCircle
 } from 'lucide-react';
-import { Hardware, NetworkDevice, GeneralInventoryItem, Assignment, ActivityLog } from '@shared/schema';
+import { Hardware, NetworkDevice, Assignment, Activity } from '@shared/schema';
 import { format } from 'date-fns';
 
 export default function ReportsPage() {
@@ -46,7 +46,7 @@ export default function ReportsPage() {
     queryKey: ['/api/network-devices'],
   });
 
-  const { data: generalInventory, isLoading: isLoadingGeneral } = useQuery<GeneralInventoryItem[]>({
+  const { data: generalInventory, isLoading: isLoadingGeneral } = useQuery<any[]>({
     queryKey: ['/api/general-inventory'],
   });
 
@@ -54,8 +54,8 @@ export default function ReportsPage() {
     queryKey: ['/api/assignments'],
   });
 
-  const { data: activityLogs, isLoading: isLoadingLogs } = useQuery<ActivityLog[]>({
-    queryKey: ['/api/activity-logs'],
+  const { data: activityLogs, isLoading: isLoadingLogs } = useQuery<Activity[]>({
+    queryKey: ['/api/activities'],
   });
 
   // Calculate inventory statistics by type
@@ -93,7 +93,7 @@ export default function ReportsPage() {
 
   // Activity over time (last 10 logs grouped by date)
   const activityByDate = activityLogs?.reduce((acc: Record<string, number>, log) => {
-    const date = format(new Date(log.timestamp), 'MMM d');
+    const date = format(new Date(log.createdAt || new Date()), 'MMM d');
     acc[date] = (acc[date] || 0) + 1;
     return acc;
   }, {});
@@ -462,7 +462,7 @@ export default function ReportsPage() {
                           {activityLogs.slice(0, 10).map((log) => (
                             <tr key={log.id} className="hover:bg-muted/50 transition">
                               <td className="px-6 py-4 whitespace-nowrap">
-                                {format(new Date(log.timestamp), 'MMM d, yyyy h:mm a')}
+                                {format(new Date(log.createdAt || new Date()), 'MMM d, yyyy h:mm a')}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {log.userId}
@@ -471,10 +471,10 @@ export default function ReportsPage() {
                                 {log.action}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap capitalize">
-                                {log.itemType.replace('_', ' ')}
+                                {log.action?.replace('_', ' ') || log.entityType || 'Unknown'}
                               </td>
                               <td className="px-6 py-4">
-                                {log.details}
+                                {log.details ? JSON.stringify(log.details) : '-'}
                               </td>
                             </tr>
                           ))}

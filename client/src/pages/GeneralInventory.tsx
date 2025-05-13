@@ -19,7 +19,18 @@ import {
   Trash2,
   AlertCircle
 } from 'lucide-react';
-import { GeneralInventoryItem } from '@shared/schema';
+// Define a type for General Inventory Item since it doesn't exist in the schema
+interface GeneralInventoryItem {
+  id: number;
+  name: string;
+  description?: string;
+  category: string;
+  serialNumber?: string;
+  location?: string;
+  status: string;
+  purchaseDate?: Date;
+  warranty?: string;
+}
 import { AddGeneralInventoryModal } from '@/components/modals/AddGeneralInventoryModal';
 
 export default function GeneralInventoryPage() {
