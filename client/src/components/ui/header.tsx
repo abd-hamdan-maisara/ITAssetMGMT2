@@ -111,9 +111,9 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
               >
                 <Avatar className="h-8 w-8 mr-2">
                   <AvatarImage src="https://github.com/shadcn.png" alt="User profile" />
-                  <AvatarFallback>JD</AvatarFallback>
+                  <AvatarFallback>SA</AvatarFallback>
                 </Avatar>
-                <span className="hidden md:block text-sm">John Doe</span>
+                <span className="hidden md:block text-sm">System Admin</span>
                 {showUserMenu ? (
                   <ChevronUp className="h-4 w-4 text-gray-600" />
                 ) : (
@@ -127,14 +127,17 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
                   className="absolute right-0 mt-2 w-48 bg-background border border-border rounded-md shadow-lg py-1 z-50"
                   onClick={() => setShowUserMenu(false)}
                 >
-                  <a href="#" className="block px-4 py-2 text-sm text-foreground hover:bg-muted">
+                  <a href="/profile" className="block px-4 py-2 text-sm text-foreground hover:bg-muted">
                     Your Profile
                   </a>
-                  <a href="#" className="block px-4 py-2 text-sm text-foreground hover:bg-muted">
-                    Settings
+                  <a href="/settings" className="block px-4 py-2 text-sm text-foreground hover:bg-muted">
+                    System Settings
+                  </a>
+                  <a href="/activity-log" className="block px-4 py-2 text-sm text-foreground hover:bg-muted">
+                    Activity Log
                   </a>
                   <div className="border-t border-border my-1"></div>
-                  <a href="#" className="block px-4 py-2 text-sm text-destructive hover:bg-destructive/10">
+                  <a href="/auth" className="block px-4 py-2 text-sm text-destructive hover:bg-destructive/10">
                     Sign out
                   </a>
                 </div>

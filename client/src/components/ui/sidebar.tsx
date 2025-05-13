@@ -2,9 +2,6 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
-  Package, 
-  ShoppingCart, 
-  Truck, 
   BarChart, 
   Settings, 
   ChevronDown, 
@@ -13,7 +10,13 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useState } from "react";
-import { InventoryIcon } from "@/lib/inventory-icons";
+import { 
+  HardwareIcon, 
+  NetworkIcon, 
+  CredentialIcon, 
+  AssignmentIcon, 
+  UsersIcon 
+} from "@/lib/inventory-icons";
 
 interface SidebarProps {
   open: boolean;
@@ -38,9 +41,9 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
       aria-label="Main Navigation"
     >
       <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-        <div className="flex items-center space-x-2" aria-label="Inventory Management System">
-          <InventoryIcon className="text-primary h-8 w-8" />
-          <span className="font-bold text-xl">InvenTrack</span>
+        <div className="flex items-center space-x-2" aria-label="IT Management System">
+          <HardwareIcon className="text-primary h-8 w-8" />
+          <span className="font-bold text-xl">ITManager</span>
         </div>
         <button 
           onClick={() => setOpen(false)} 
@@ -56,27 +59,38 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
         <Link href="/">
           <div className={cn(
             "flex items-center px-4 py-2 rounded-md transition-colors",
-            isActive("/") ? "bg-primary text-white" : "text-gray-700 hover:bg-gray-100"
+            isActive("/") ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
           )} aria-current={isActive("/") ? "page" : undefined}>
             <LayoutDashboard className="mr-3 h-5 w-5" />
             <span>Dashboard</span>
           </div>
         </Link>
         
-        {/* Products */}
+        {/* Hardware */}
+        <Link href="/hardware">
+          <div className={cn(
+            "flex items-center px-4 py-2 rounded-md transition-colors",
+            isActive("/hardware") ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
+          )}>
+            <HardwareIcon className="mr-3 h-5 w-5" />
+            <span>Hardware</span>
+          </div>
+        </Link>
+        
+        {/* Networking */}
         <div>
           <button 
             onClick={() => setProductsSubmenuOpen(!productsSubmenuOpen)} 
             className={cn(
               "flex items-center justify-between px-4 py-2 w-full text-left rounded-md transition-colors",
-              isProductsActive() ? "bg-primary-light text-white" : "text-gray-700 hover:bg-gray-100"
+              (isActive("/networking") || isActive("/vlans")) ? "bg-primary/90 text-primary-foreground" : "text-foreground hover:bg-muted"
             )}
             aria-expanded={productsSubmenuOpen}
-            aria-controls="products-submenu"
+            aria-controls="networking-submenu"
           >
             <div className="flex items-center">
-              <Package className="mr-3 h-5 w-5" />
-              <span>Products</span>
+              <NetworkIcon className="mr-3 h-5 w-5" />
+              <span>Networking</span>
             </div>
             {productsSubmenuOpen ? (
               <ChevronUp className="h-4 w-4" />
@@ -86,50 +100,61 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
           </button>
           
           <div 
-            id="products-submenu" 
+            id="networking-submenu" 
             className={cn(
               "pl-10 space-y-1 mt-1",
               productsSubmenuOpen ? "block" : "hidden"
             )}
           >
-            <Link href="/products">
+            <Link href="/networking">
               <div className={cn(
                 "flex items-center px-4 py-2 rounded-md transition-colors",
-                isActive("/products") ? "bg-primary-dark text-white" : "text-gray-700 hover:bg-gray-100"
+                isActive("/networking") ? "bg-primary/80 text-primary-foreground" : "text-foreground hover:bg-muted"
               )}>
-                <span>All Products</span>
+                <span>Devices</span>
               </div>
             </Link>
-            <Link href="/categories">
+            <Link href="/vlans">
               <div className={cn(
                 "flex items-center px-4 py-2 rounded-md transition-colors",
-                isActive("/categories") ? "bg-primary-dark text-white" : "text-gray-700 hover:bg-gray-100"
+                isActive("/vlans") ? "bg-primary/80 text-primary-foreground" : "text-foreground hover:bg-muted"
               )}>
-                <span>Categories</span>
+                <span>VLANs</span>
               </div>
             </Link>
           </div>
         </div>
         
-        {/* Orders */}
-        <Link href="/orders">
+        {/* Credentials */}
+        <Link href="/credentials">
           <div className={cn(
             "flex items-center px-4 py-2 rounded-md transition-colors",
-            isActive("/orders") ? "bg-primary text-white" : "text-gray-700 hover:bg-gray-100"
+            isActive("/credentials") ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
           )}>
-            <ShoppingCart className="mr-3 h-5 w-5" />
-            <span>Orders</span>
+            <CredentialIcon className="mr-3 h-5 w-5" />
+            <span>Credentials</span>
           </div>
         </Link>
         
-        {/* Suppliers */}
-        <Link href="/suppliers">
+        {/* Assignments */}
+        <Link href="/assignments">
           <div className={cn(
             "flex items-center px-4 py-2 rounded-md transition-colors",
-            isActive("/suppliers") ? "bg-primary text-white" : "text-gray-700 hover:bg-gray-100"
+            isActive("/assignments") ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
           )}>
-            <Truck className="mr-3 h-5 w-5" />
-            <span>Suppliers</span>
+            <AssignmentIcon className="mr-3 h-5 w-5" />
+            <span>Assignments</span>
+          </div>
+        </Link>
+        
+        {/* Users */}
+        <Link href="/users">
+          <div className={cn(
+            "flex items-center px-4 py-2 rounded-md transition-colors",
+            isActive("/users") ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
+          )}>
+            <UsersIcon className="mr-3 h-5 w-5" />
+            <span>Users</span>
           </div>
         </Link>
         
@@ -137,7 +162,7 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
         <Link href="/reports">
           <div className={cn(
             "flex items-center px-4 py-2 rounded-md transition-colors",
-            isActive("/reports") ? "bg-primary text-white" : "text-gray-700 hover:bg-gray-100"
+            isActive("/reports") ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
           )}>
             <BarChart className="mr-3 h-5 w-5" />
             <span>Reports</span>
@@ -148,7 +173,7 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
         <Link href="/settings">
           <div className={cn(
             "flex items-center px-4 py-2 rounded-md transition-colors",
-            isActive("/settings") ? "bg-primary text-white" : "text-gray-700 hover:bg-gray-100"
+            isActive("/settings") ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
           )}>
             <Settings className="mr-3 h-5 w-5" />
             <span>Settings</span>
@@ -160,11 +185,11 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
         <div className="flex items-center">
           <Avatar>
             <AvatarImage src="https://github.com/shadcn.png" alt="User profile" />
-            <AvatarFallback>JD</AvatarFallback>
+            <AvatarFallback>SA</AvatarFallback>
           </Avatar>
           <div className="ml-3">
-            <p className="text-sm font-medium">John Doe</p>
-            <p className="text-xs text-gray-500">Admin</p>
+            <p className="text-sm font-medium">System Administrator</p>
+            <p className="text-xs text-gray-500">IT Department</p>
           </div>
         </div>
       </div>
