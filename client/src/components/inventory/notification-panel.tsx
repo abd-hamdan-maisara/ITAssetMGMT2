@@ -35,35 +35,43 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
     };
   }, [onClose]);
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case "product_added":
+  const getNotificationIcon = (action: string) => {
+    switch (action) {
+      case "hardware_added":
         return <Plus className="text-primary p-1 rounded-full text-sm" />;
-      case "stock_updated":
+      case "hardware_updated":
         return <RefreshCcw className="text-green-500 p-1 rounded-full text-sm" />;
       case "low_stock_alert":
         return <AlertTriangle className="text-amber-500 p-1 rounded-full text-sm" />;
-      case "order_placed":
+      case "assignment_created":
         return <ShoppingCart className="text-primary p-1 rounded-full text-sm" />;
-      case "order_received":
+      case "assignment_completed":
         return <TruckIcon className="text-blue-500 p-1 rounded-full text-sm" />;
+      case "network_device_added":
+        return <Plus className="text-primary p-1 rounded-full text-sm" />;
+      case "user_login":
+        return <CheckCircle className="text-green-500 p-1 rounded-full text-sm" />;
       default:
         return <CheckCircle className="text-primary p-1 rounded-full text-sm" />;
     }
   };
 
-  const getNotificationIconBackground = (type: string) => {
-    switch (type) {
-      case "product_added":
+  const getNotificationIconBackground = (action: string) => {
+    switch (action) {
+      case "hardware_added":
         return "bg-primary bg-opacity-20";
-      case "stock_updated":
+      case "hardware_updated":
         return "bg-green-500 bg-opacity-20";
       case "low_stock_alert":
         return "bg-amber-500 bg-opacity-20";
-      case "order_placed":
+      case "assignment_created":
         return "bg-primary bg-opacity-20";
-      case "order_received":
+      case "assignment_completed":
         return "bg-blue-500 bg-opacity-20";
+      case "network_device_added":
+        return "bg-primary bg-opacity-20";
+      case "user_login":
+        return "bg-green-500 bg-opacity-20";
       default:
         return "bg-primary bg-opacity-20";
     }
@@ -95,14 +103,14 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
             onClick={(e) => e.preventDefault()}
           >
             <div className="flex items-start">
-              <div className={cn("mr-3 flex items-center justify-center rounded-full", getNotificationIconBackground(notification.type))}>
-                {getNotificationIcon(notification.type)}
+              <div className={cn("mr-3 flex items-center justify-center rounded-full", getNotificationIconBackground(notification.action))}>
+                {getNotificationIcon(notification.action)}
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium">{notification.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
-                <p className="text-xs text-muted-foreground">{notification.description}</p>
+                <p className="text-sm font-medium">{notification.action ? notification.action.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()) : 'Activity'}</p>
+                <p className="text-xs text-muted-foreground">{notification.details ? JSON.stringify(notification.details) : notification.entityType}</p>
                 <p className="text-xs text-muted-foreground/70 mt-1">
-                  {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                  {notification.createdAt ? formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true }) : 'Recently'}
                 </p>
               </div>
             </div>
