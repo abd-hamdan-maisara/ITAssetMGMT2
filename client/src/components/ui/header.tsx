@@ -6,6 +6,7 @@ import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface HeaderProps {
   sidebarOpen: boolean;
@@ -62,12 +63,15 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
             <div className="relative hidden md:block">
               <Input 
                 type="text" 
-                placeholder="Search inventory..." 
-                className="w-64 pl-10"
-                aria-label="Search inventory"
+                placeholder="Search IT assets..." 
+                className="w-64 pl-10 bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/50"
+                aria-label="Search IT assets"
               />
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary-foreground/70 h-4 w-4" />
             </div>
+            
+            {/* Theme Toggle */}
+            <ThemeToggle />
             
             {/* Notifications */}
             <div className="relative">

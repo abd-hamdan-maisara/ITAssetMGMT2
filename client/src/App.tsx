@@ -17,7 +17,7 @@ import Header from "@/components/ui/header";
 import { useState } from "react";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "@/hooks/use-auth";
-import { ThemeProvider } from "@/components/ui/theme-provider";
+// Using next-themes provider from main.tsx
 
 function Router() {
   return (
@@ -41,28 +41,26 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light">
-        <AuthProvider>
-          <TooltipProvider>
-            <div className="flex h-screen overflow-hidden bg-background text-foreground">
-              <Sidebar 
-                open={sidebarOpen} 
-                setOpen={setSidebarOpen} 
+      <AuthProvider>
+        <TooltipProvider>
+          <div className="flex h-screen overflow-hidden bg-background text-foreground">
+            <Sidebar 
+              open={sidebarOpen} 
+              setOpen={setSidebarOpen} 
+            />
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <Header 
+                sidebarOpen={sidebarOpen} 
+                setSidebarOpen={setSidebarOpen} 
               />
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <Header 
-                  sidebarOpen={sidebarOpen} 
-                  setSidebarOpen={setSidebarOpen} 
-                />
-                <main className="flex-1 overflow-y-auto p-4 bg-muted/30" aria-label="Main content">
-                  <Router />
-                </main>
-              </div>
+              <main className="flex-1 overflow-y-auto p-4 bg-muted/30" aria-label="Main content">
+                <Router />
+              </main>
             </div>
-            <Toaster />
-          </TooltipProvider>
-        </AuthProvider>
-      </ThemeProvider>
+          </div>
+          <Toaster />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
