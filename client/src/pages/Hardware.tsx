@@ -21,12 +21,17 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Hardware as HardwareType, HardwareStatus } from '@shared/schema';
+import { AddHardwareModal } from '@/components/modals/AddHardwareModal';
 
 export default function HardwarePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [addModalOpen, setAddModalOpen] = useState(false);
+  
+  // Modal handlers
+  const openAddModal = () => setAddModalOpen(true);
+  const closeAddModal = () => setAddModalOpen(false);
 
   const { data: hardware, isLoading, error } = useQuery<HardwareType[]>({
     queryKey: ['/api/hardware'],
@@ -89,7 +94,7 @@ export default function HardwarePage() {
           <h1 className="text-2xl font-bold">Hardware Inventory</h1>
           <p className="text-muted-foreground">Manage IT hardware assets and devices</p>
         </div>
-        <Button onClick={() => setAddModalOpen(true)}>
+        <Button onClick={openAddModal}>
           <Plus className="mr-2 h-4 w-4" />
           Add Hardware
         </Button>
@@ -300,7 +305,7 @@ export default function HardwarePage() {
                 ? "No hardware items match your search criteria. Try adjusting your filters."
                 : "There are no hardware items in the inventory yet."}
             </p>
-            <Button variant="outline" onClick={() => setAddModalOpen(true)}>
+            <Button variant="outline" onClick={openAddModal}>
               <Plus className="mr-2 h-4 w-4" />
               Add Hardware
             </Button>
@@ -308,11 +313,11 @@ export default function HardwarePage() {
         )}
       </Card>
 
-      {/* Modal would go here */}
-      {/* <AddHardwareModal
+      {/* Hardware Add Modal */}
+      <AddHardwareModal
         open={addModalOpen}
-        onOpenChange={setAddModalOpen}
-      /> */}
+        onClose={closeAddModal}
+      />
     </div>
   );
 }
